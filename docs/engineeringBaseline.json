@@ -1,0 +1,734 @@
+{
+  "schemaVersion": 1,
+  "baselineVersion": 3,
+  "confirmedOn": "2026-11-10",
+  "timezone": "Asia/Shanghai",
+  "purpose": "implementationBaselineNotReleaseAcceptance",
+  "source": {
+    "repository": "https://github.com/clash-verge-rev/clash-verge-rev",
+    "tag": "v2.5.9",
+    "commit": "160bb4fe8eaef2bc626163d89622229e5d7c5b59",
+    "files": {
+      "package.json": {
+        "url": "https://raw.githubusercontent.com/clash-verge-rev/clash-verge-rev/160bb4fe8eaef2bc626163d89622229e5d7c5b59/package.json",
+        "size": 5342,
+        "sha256": "5030b3bef64701b2f5836b4b18dd72ec3d27251178932da9550fd375d04bb737"
+      },
+      "pnpm-lock.yaml": {
+        "url": "https://raw.githubusercontent.com/clash-verge-rev/clash-verge-rev/160bb4fe8eaef2bc626163d89622229e5d7c5b59/pnpm-lock.yaml",
+        "size": 370047,
+        "sha256": "b7ae85103846e101e42a62aae69c0ffeae56126d394937e92845176414124546"
+      },
+      "Cargo.toml": {
+        "url": "https://raw.githubusercontent.com/clash-verge-rev/clash-verge-rev/160bb4fe8eaef2bc626163d89622229e5d7c5b59/Cargo.toml",
+        "size": 4585,
+        "sha256": "7ba51f4d04f832fe9857aa6312a2e5de5ae3fbbedb09af80a74f02f114d98caf"
+      },
+      "src-tauri/Cargo.toml": {
+        "url": "https://raw.githubusercontent.com/clash-verge-rev/clash-verge-rev/160bb4fe8eaef2bc626163d89622229e5d7c5b59/src-tauri/Cargo.toml",
+        "size": 5111,
+        "sha256": "83e25a3736e65ca69af7803660745dd5312c53cf43bec5b0df97a9fba18f942d"
+      },
+      "Cargo.lock": {
+        "url": "https://raw.githubusercontent.com/clash-verge-rev/clash-verge-rev/160bb4fe8eaef2bc626163d89622229e5d7c5b59/Cargo.lock",
+        "size": 244088,
+        "sha256": "ea94968bea1298049483e6bc5b51fc7642ecf3794441a3cda3262f55aae7e66f"
+      },
+      "rust-toolchain.toml": {
+        "url": "https://raw.githubusercontent.com/clash-verge-rev/clash-verge-rev/160bb4fe8eaef2bc626163d89622229e5d7c5b59/rust-toolchain.toml",
+        "size": 66,
+        "sha256": "5e7517b95a2b4e810124f84091dd4a6e3f2192523fcac7b6d52abc7fc6aff91d"
+      },
+      ".github/workflows/release.yml": {
+        "url": "https://raw.githubusercontent.com/clash-verge-rev/clash-verge-rev/160bb4fe8eaef2bc626163d89622229e5d7c5b59/.github/workflows/release.yml",
+        "size": 27474,
+        "sha256": "c46edfef8e3979cea1c102b09db07ca9dbb59b5c033acb07dea5ee97c8ba81f5"
+      },
+      "scripts/prebuild.mjs": {
+        "url": "https://raw.githubusercontent.com/clash-verge-rev/clash-verge-rev/160bb4fe8eaef2bc626163d89622229e5d7c5b59/scripts/prebuild.mjs",
+        "size": 25060,
+        "sha256": "20595bbc402c16475a3274abdaa308af8c3dfca2824564e0065aa9f4c8fa5d59"
+      }
+    },
+    "pnpmYamlDocumentCount": 2
+  },
+  "toolchain": {
+    "node": "26.13.0",
+    "pnpm": "12.16.1",
+    "rust": "1.99.1",
+    "rustEdition": "2024",
+    "rustTarget": "x86_64-pc-windows-msvc",
+    "crtLinkageDecision": "staticForTargetBinariesPendingNativeDependencyVerification",
+    "powershellMinimumMajor": 7
+  },
+  "resolvedDependencies": {
+    "frontend": {
+      "@emotion/react": {
+        "specifier": "^11.14.0",
+        "version": "11.14.0(@types/react@19.3.0)(react@19.3.1)(supports-color@7.2.0)"
+      },
+      "@emotion/styled": {
+        "specifier": "^11.14.1",
+        "version": "11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1)(supports-color@7.2.0))(@types/react@19.3.0)(react@19.3.1)(supports-color@7.2.0)"
+      },
+      "@mui/material": {
+        "specifier": "^9.4.0",
+        "version": "9.4.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1)(supports-color@7.2.0))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1)(supports-color@7.2.0))(@types/react@19.3.0)(react@19.3.1)(supports-color@7.2.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)"
+      },
+      "@tauri-apps/api": {
+        "specifier": "2.12.4",
+        "version": "2.12.4"
+      },
+      "react": {
+        "specifier": "19.3.1",
+        "version": "19.3.1"
+      },
+      "react-dom": {
+        "specifier": "19.3.1",
+        "version": "19.3.1(react@19.3.1)"
+      },
+      "react-router": {
+        "specifier": "^8.4.0",
+        "version": "8.4.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)"
+      },
+      "swr": {
+        "specifier": "^2.5.1",
+        "version": "2.5.1(react@19.3.1)"
+      },
+      "tauri-plugin-mihomo-api": {
+        "specifier": "github:clash-verge-rev/tauri-plugin-mihomo#main",
+        "version": "https://codeload.github.com/clash-verge-rev/tauri-plugin-mihomo/tar.gz/7a03d16f4d39b1bb885b7babe66b9e153e34b615"
+      },
+      "@biomejs/biome": {
+        "specifier": "^2.5.14",
+        "version": "2.5.14"
+      },
+      "@tauri-apps/cli": {
+        "specifier": "2.12.3",
+        "version": "2.12.3"
+      },
+      "eslint": {
+        "specifier": "^10.11.0",
+        "version": "10.11.0(jiti@2.7.0)(supports-color@7.2.0)"
+      },
+      "tsrs": {
+        "specifier": "0.20.0-ts7.1.0-beta",
+        "version": "0.20.0-ts7.1.0-beta"
+      },
+      "typescript": {
+        "specifier": "^6.0.3",
+        "version": "6.0.3"
+      },
+      "vite": {
+        "specifier": "^8.3.0",
+        "version": "8.3.0(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(terser@5.51.2)(yaml@2.9.1)"
+      },
+      "vitest": {
+        "specifier": "^5.0.1",
+        "version": "5.0.1(@types/node@26.6.5)(vite@8.3.0(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(terser@5.51.2)(yaml@2.9.1))"
+      }
+    },
+    "rust": [
+      {
+        "name": "clash_verge_service_ipc",
+        "version": "2.7.6",
+        "source": "git+https://github.com/clash-verge-rev/clash-verge-service-ipc.git?tag=v2.7.6#b2a7427d6681c8d3780ab83a73f4dc21da2f22d6"
+      },
+      {
+        "name": "muda",
+        "version": "0.20.0",
+        "source": "git+https://github.com/wonfen/muda.git?rev=547de49352791653fbdfa785f20f3c7ece8468e2#547de49352791653fbdfa785f20f3c7ece8468e2"
+      },
+      {
+        "name": "reqwest",
+        "version": "0.12.28",
+        "source": "registry+https://github.com/rust-lang/crates.io-index"
+      },
+      {
+        "name": "reqwest",
+        "version": "0.13.5",
+        "source": "registry+https://github.com/rust-lang/crates.io-index"
+      },
+      {
+        "name": "serde",
+        "version": "1.0.229",
+        "source": "registry+https://github.com/rust-lang/crates.io-index"
+      },
+      {
+        "name": "serde_json",
+        "version": "1.0.154",
+        "source": "registry+https://github.com/rust-lang/crates.io-index"
+      },
+      {
+        "name": "serde_yaml_ng",
+        "version": "0.10.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index"
+      },
+      {
+        "name": "sysproxy",
+        "version": "0.7.1",
+        "source": "git+https://github.com/clash-verge-rev/sysproxy-rs.git?branch=main#89ad876a0942c049ae72e1472f9fc3ed62023c5e"
+      },
+      {
+        "name": "tauri",
+        "version": "2.12.4",
+        "source": "registry+https://github.com/rust-lang/crates.io-index"
+      },
+      {
+        "name": "tauri-build",
+        "version": "2.7.3",
+        "source": "registry+https://github.com/rust-lang/crates.io-index"
+      },
+      {
+        "name": "tauri-plugin-mihomo",
+        "version": "0.6.0",
+        "source": "git+https://github.com/clash-verge-rev/tauri-plugin-mihomo?rev=7a03d16f4d39b1bb885b7babe66b9e153e34b615#7a03d16f4d39b1bb885b7babe66b9e153e34b615"
+      },
+      {
+        "name": "tokio",
+        "version": "1.53.3",
+        "source": "registry+https://github.com/rust-lang/crates.io-index"
+      },
+      {
+        "name": "tracing-estuary",
+        "version": "0.1.0",
+        "source": "git+https://github.com/Tunglies/tracing-estuary.git?branch=main#dbfce033fa4cff8f936f3e7c2282af1277546f3c"
+      },
+      {
+        "name": "windows",
+        "version": "0.61.3",
+        "source": "registry+https://github.com/rust-lang/crates.io-index"
+      },
+      {
+        "name": "windows",
+        "version": "0.62.2",
+        "source": "registry+https://github.com/rust-lang/crates.io-index"
+      },
+      {
+        "name": "windows-sys",
+        "version": "0.45.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index"
+      },
+      {
+        "name": "windows-sys",
+        "version": "0.48.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index"
+      },
+      {
+        "name": "windows-sys",
+        "version": "0.52.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index"
+      },
+      {
+        "name": "windows-sys",
+        "version": "0.59.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index"
+      },
+      {
+        "name": "windows-sys",
+        "version": "0.60.2",
+        "source": "registry+https://github.com/rust-lang/crates.io-index"
+      },
+      {
+        "name": "windows-sys",
+        "version": "0.61.2",
+        "source": "registry+https://github.com/rust-lang/crates.io-index"
+      }
+    ]
+  },
+  "gitDependencies": [
+    {
+      "name": "clash_verge_service_ipc",
+      "version": "2.7.6",
+      "source": "git+https://github.com/clash-verge-rev/clash-verge-service-ipc.git?tag=v2.7.6#b2a7427d6681c8d3780ab83a73f4dc21da2f22d6",
+      "commit": "b2a7427d6681c8d3780ab83a73f4dc21da2f22d6"
+    },
+    {
+      "name": "muda",
+      "version": "0.20.0",
+      "source": "git+https://github.com/wonfen/muda.git?rev=547de49352791653fbdfa785f20f3c7ece8468e2#547de49352791653fbdfa785f20f3c7ece8468e2",
+      "commit": "547de49352791653fbdfa785f20f3c7ece8468e2"
+    },
+    {
+      "name": "sysproxy",
+      "version": "0.7.1",
+      "source": "git+https://github.com/clash-verge-rev/sysproxy-rs.git?branch=main#89ad876a0942c049ae72e1472f9fc3ed62023c5e",
+      "commit": "89ad876a0942c049ae72e1472f9fc3ed62023c5e"
+    },
+    {
+      "name": "tauri-plugin-mihomo",
+      "version": "0.6.0",
+      "source": "git+https://github.com/clash-verge-rev/tauri-plugin-mihomo?rev=7a03d16f4d39b1bb885b7babe66b9e153e34b615#7a03d16f4d39b1bb885b7babe66b9e153e34b615",
+      "commit": "7a03d16f4d39b1bb885b7babe66b9e153e34b615"
+    },
+    {
+      "name": "tracing-estuary",
+      "version": "0.1.0",
+      "source": "git+https://github.com/Tunglies/tracing-estuary.git?branch=main#dbfce033fa4cff8f936f3e7c2282af1277546f3c",
+      "commit": "dbfce033fa4cff8f936f3e7c2282af1277546f3c"
+    }
+  ],
+  "buildToolchain": {
+    "visualStudioVersion": "17.14.44",
+    "buildVersion": "17.14.37827.9",
+    "catalog": {
+      "fileName": "VisualStudio.vsman",
+      "sha256": "4cc372d79f02e331c999a926b833a49eb74b30357d30f41ba9cffa1dc0369379",
+      "size": 30443645,
+      "url": "https://download.visualstudio.microsoft.com/download/pr/6bd63d7f-1818-4e03-a552-9feb11496c19/4cc372d79f02e331c999a926b833a49eb74b30357d30f41ba9cffa1dc0369379/VisualStudio.vsman"
+    },
+    "actualCatalogSha256": "963760b01f621ed4fa40d1cf97aeb042f7bc6e04e3176c13c38abb19d265f789",
+    "catalogHashVerified": false,
+    "packages": [
+      {
+        "id": "Microsoft.VC.14.44.17.14.Tools.HostX64.TargetX64",
+        "version": "14.44.35229",
+        "dependencies": {
+          "Microsoft.VC.14.44.17.14.Tools.HostX64.TargetX64.base": "14.44.35229"
+        }
+      },
+      {
+        "id": "Microsoft.VC.14.44.17.14.Tools.HostX64.TargetX64.base",
+        "version": "14.44.35229",
+        "dependencies": {
+          "Microsoft.VC.14.44.17.14.Tools.HostX64.TargetX64.Res.base": "14.44.35229",
+          "Microsoft.VC.14.44.17.14.Props.x64": "14.44.35229",
+          "Microsoft.VC.14.44.17.14.Servicing.Compilers": "14.44.35229"
+        }
+      },
+      {
+        "id": "Win11SDK_10.0.26100",
+        "version": "10.0.26100.15",
+        "dependencies": null
+      }
+    ],
+    "independentRefetch": {
+      "url": "https://download.visualstudio.microsoft.com/download/pr/6bd63d7f-1818-4e03-a552-9feb11496c19/4cc372d79f02e331c999a926b833a49eb74b30357d30f41ba9cffa1dc0369379/VisualStudio.vsman?baseline=20261110",
+      "size": 17954755,
+      "sha256": "963760b01f621ed4fa40d1cf97aeb042f7bc6e04e3176c13c38abb19d265f789",
+      "matchesPublishedDigest": false
+    },
+    "bootstrapper": {
+      "url": "https://download.visualstudio.microsoft.com/download/pr/6bd63d7f-1818-4e03-a552-9feb11496c19/5dc747350fb0589f908915c7b5fa52ec22d22b37ae2e5f4964d83519667498b2/vs_BuildTools.exe",
+      "sha256": "5dc747350fb0589f908915c7b5fa52ec22d22b37ae2e5f4964d83519667498b2",
+      "size": 4474816,
+      "version": "17.14.44",
+      "signatureStatus": "Valid",
+      "signer": "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+      "matchesPublishedDigest": true
+    },
+    "acceptedAsTrustedLayout": false,
+    "compilerTargetVersion": "14.44.35229",
+    "sdkPackageTargetVersion": "10.0.26100.15",
+    "installationValidation": "notRun",
+    "developmentEnvironment": {
+      "visualStudioProduct": "Visual Studio Community 2026",
+      "visualStudioVersion": "18.6.2",
+      "pinnedReleaseToolchainMatched": false,
+      "powershellVersion": "7.6.9",
+      "applicationLaunched": false,
+      "installerBuilt": false,
+      "pinnedMsvcCompilerMatched": true,
+      "compilerVersionObserved": "14.44.35229.0",
+      "windowsSdkVersionObserved": "10.0.26100.0"
+    },
+    "acceptedCatalog": {
+      "fileName": "VisualStudio.17.14.44.vsman",
+      "url": "https://download.visualstudio.microsoft.com/download/pr/6bd63d7f-1818-4e03-a552-9feb11496c19/4cc372d79f02e331c999a926b833a49eb74b30357d30f41ba9cffa1dc0369379/VisualStudio.vsman",
+      "size": 17954755,
+      "sha256": "963760b01f621ed4fa40d1cf97aeb042f7bc6e04e3176c13c38abb19d265f789",
+      "trustBasis": "pinnedBytesAndMicrosoftEmbeddedSignature",
+      "signature": {
+        "subject": "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+        "certificateThumbprint": "1D77A9B9E8FE2075D9AD15123257FB90DB0DA4A1",
+        "verificationResult": "Success",
+        "rootCertificateThumbprint": "8F43288AD272F3103B6FB1428485EA3014C0BCFE"
+      },
+      "channelMetadataMatched": false
+    },
+    "catalogSignatureVerified": true,
+    "msvcDirectoryVersion": "14.44.35207",
+    "msvcPayloads": [
+      {
+        "id": "Microsoft.VC.14.44.17.14.CRT.Headers.base",
+        "version": "14.44.35220",
+        "sha256": "852382a9aa73502b7849c1bcadfb603ba7175c4e8b60e6aba03c7de711d4ece5"
+      },
+      {
+        "id": "Microsoft.VC.14.44.17.14.CRT.x64.Desktop.base",
+        "version": "14.44.35226",
+        "sha256": "f01f701a7bcd9587a340898c851424f6a52bb913a70c185ff0d5bf0288c5831a"
+      },
+      {
+        "id": "Microsoft.VC.14.44.17.14.Tools.HostX64.TargetX64.base",
+        "version": "14.44.35229",
+        "sha256": "f4ad3cee4ef18e9f36382399261de27be6910ab3467178d7e687377ec841306d"
+      },
+      {
+        "id": "Microsoft.VC.14.44.17.14.Tools.HostX64.TargetX64.Res.base",
+        "version": "14.44.35229",
+        "sha256": "603375e4d6d639bc6e0a7d0d657b17e0c3b72e52450f78eb41e987f40c3b5305"
+      }
+    ]
+  },
+  "artifacts": {
+    "core": {
+      "name": "mihomo-windows-amd64-v2-v1.19.33.zip",
+      "url": "https://github.com/MetaCubeX/mihomo/releases/download/v1.19.33/mihomo-windows-amd64-v2-v1.19.33.zip",
+      "expectedSha256": "e997417c2d50c45c314448e4749c52b912323f493f2580e475af7f9bda3dbf64",
+      "assetId": 663189082,
+      "releaseId": 419818179,
+      "sha256": "e997417c2d50c45c314448e4749c52b912323f493f2580e475af7f9bda3dbf64",
+      "size": 22532148,
+      "verifiedDownload": true,
+      "files": [
+        {
+          "name": "mihomo-windows-amd64-v2.exe",
+          "sha256": "0b4c7353057a78de8a09db445351aadec7d72a4f48adc7d99691f3c5ff74d3da",
+          "size": 61271040
+        }
+      ],
+      "version": "v1.19.33",
+      "repository": "https://github.com/MetaCubeX/mihomo",
+      "sourceCommit": "3f27ef39f8c96bbfbc8b0b9bb10f5c9ef60149d8",
+      "goVersion": "go1.26.10",
+      "buildSettings": {
+        "-buildmode": "exe",
+        "-compiler": "gc",
+        "-tags": "with_gvisor",
+        "-trimpath": "true",
+        "DefaultGODEBUG": "asynctimerchan=1,containermaxprocs=0,cryptocustomrand=1,decoratemappings=0,gotestjsonbuildtext=1,gotypesalias=0,httpcookiemaxnum=0,httplaxcontentlength=1,httpmuxgo121=1,httpservecontentkeepheaders=1,httpservecontentmaxranges=1,multipathtcp=0,panicnil=1,randseednop=0,rsa1024min=0,tls10server=1,tls3des=1,tlsmlkem=0,tlsrsakex=1,tlssecpmlkem=0,tlssha1=1,tlsunsafeekm=1,updatemaxprocs=0,urlmaxqueryparams=0,urlstrictcolons=0,winreadlinkvolume=0,winsymlink=0,x509keypairleaf=0,x509negativeserial=1,x509rsacrt=0,x509sha256skid=0,x509usepolicies=0",
+        "CGO_ENABLED": "0",
+        "GOARCH": "amd64",
+        "GOOS": "windows",
+        "GOAMD64": "v2",
+        "vcs": "git",
+        "vcs.revision": "3f27ef39f8c96bbfbc8b0b9bb10f5c9ef60149d8",
+        "vcs.time": "2026-10-21T15:51:58Z",
+        "vcs.modified": "true"
+      },
+      "authenticodeStatus": "NotSigned",
+      "sourceReproducibility": "buildInputsArchivedBitReproducibilityNotProven",
+      "buildWorkflowUrl": "https://github.com/MetaCubeX/mihomo/blob/3f27ef39f8c96bbfbc8b0b9bb10f5c9ef60149d8/.github/workflows/build.yml"
+    },
+    "webview2": {
+      "name": "Microsoft.WebView2.FixedVersionRuntime.157.0.4341.46.x64.cab",
+      "url": "https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/edb19202-9173-4dd1-ab87-c45c2d80aaec/Microsoft.WebView2.FixedVersionRuntime.157.0.4341.46.x64.cab",
+      "expectedSha256": null,
+      "sha256": "0ac7317a08c3f3beebbb9b6d90f5b77352569f0a33a54a15ef6aaabc82899b7c",
+      "size": 310997156,
+      "verifiedDownload": true,
+      "version": "157.0.4341.46",
+      "architecture": "x64",
+      "sourcePage": "https://developer.microsoft.com/en-us/microsoft-edge/webview2/",
+      "mainExecutable": {
+        "productVersion": "157.0.4341.46",
+        "signatureStatus": "Valid",
+        "signer": "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+        "sha256": "7d46f9e074d3630f52cca1ee8de6840d8edf18700901348540c2690b79d7fd9d"
+      },
+      "publishedDigestAvailable": false
+    },
+    "rules": {
+      "repository": "https://github.com/MetaCubeX/meta-rules-dat",
+      "releaseId": 438663432,
+      "publishedAt": "2026-11-09T01:50:54Z",
+      "mutableTag": "latest",
+      "identityPolicy": "assetIdAndSha256NotMutableTag",
+      "assets": [
+        {
+          "name": "geosite.dat",
+          "url": "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat",
+          "expectedSha256": "85073a00a3c3eb80ac76b97df2f97f7dab00cb36c8b5e7ed2354cbd016f8b088",
+          "assetId": 725861463,
+          "releaseId": 438663432,
+          "sha256": "85073a00a3c3eb80ac76b97df2f97f7dab00cb36c8b5e7ed2354cbd016f8b088",
+          "size": 4355962,
+          "verifiedDownload": true
+        },
+        {
+          "name": "geoip.dat",
+          "url": "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.dat",
+          "expectedSha256": "90b78ab861c1cdc3f871f305f9ceedfb8d6d6329e3a40295e6773e057297384c",
+          "assetId": 725861356,
+          "releaseId": 438663432,
+          "sha256": "90b78ab861c1cdc3f871f305f9ceedfb8d6d6329e3a40295e6773e057297384c",
+          "size": 16475153,
+          "verifiedDownload": true
+        }
+      ]
+    },
+    "coreBuildInputs": {
+      "customGo": {
+        "name": "go1.26.linux-amd64.tar.gz",
+        "url": "https://github.com/MetaCubeX/go/releases/download/build/go1.26.linux-amd64.tar.gz",
+        "sha256": "c1278af2579c9398cf22c638686e5348926b160eda784930d416d95aaa7a9221",
+        "size": 67770554,
+        "assetId": 662923077,
+        "assetUpdatedAt": "2026-10-21T15:22:53Z",
+        "versionFile": "./go/VERSION",
+        "version": "go1.26.10",
+        "includesCompilerSource": true
+      },
+      "embeddedCa": {
+        "name": "ca-certificates.crt",
+        "fileOffset": 52224416,
+        "sliceHeaderFileOffset": 59832336,
+        "size": 180744,
+        "certificateCount": 120,
+        "sha256": "0e4c9a8eb123513b1c131c0aec2d3f9ddaad02b77b8af53bff30e1e7fc3c6b71",
+        "sourceDeclaration": "component/ca/config.go: //go:embed ca-certificates.crt"
+      },
+      "parameters": {
+        "GOOS": "windows",
+        "GOARCH": "amd64",
+        "GOAMD64": "v2",
+        "CGO_ENABLED": "0",
+        "GOTOOLCHAIN": "local",
+        "tags": "with_gvisor",
+        "trimpath": true,
+        "version": "v1.19.33",
+        "buildTime": "Wed Oct 21 16:40:00 UTC 2026",
+        "ldflagsTemplate": "-extldflags --static -X 'github.com/metacubex/mihomo/constant.Version=${VERSION}' -X 'github.com/metacubex/mihomo/constant.BuildTime=${BUILDTIME}' -w -s -buildid="
+      },
+      "archiveStatus": "passedReferencedSdkSourceAndRecoveredEmbeddedCa",
+      "bitReproducibilityProven": false
+    }
+  },
+  "platform": {
+    "architecture": "x64",
+    "minimumWindows11Build": 26200,
+    "releaseTargetVersions": ["25H2", "26H2"],
+    "windows10CompatibilityCandidate": {
+      "version": "22H2",
+      "build": 19045,
+      "releaseSupported": false
+    },
+    "filesystem": "localWritableNtfsWithWindowsAcls",
+    "tunInInitialRelease": false,
+    "persistentWindowsService": false
+  },
+  "persistence": {
+    "database": null,
+    "root": "data",
+    "settingsFile": "settings.json",
+    "settingsSchemaVersion": 1,
+    "credentialsFile": "credentials.bin",
+    "credentialProtection": "dpapiCurrentUser",
+    "runtimeDirectory": "data/runtime/<sessionId>",
+    "savePlaintextCredentialsInBackups": false,
+    "runtimeConfig": "restrictedTemporaryYamlFile",
+    "sensitiveFileAclAllow": ["currentUserSid", "SYSTEM"]
+  },
+  "control": {
+    "coreTransport": "loopbackTcp",
+    "bindAddress": "127.0.0.1",
+    "randomPort": true,
+    "tokenBytes": 32,
+    "portAllocationAttempts": 5,
+    "mihomoNativePipeEnabled": false,
+    "watchdogTransport": "namedPipe",
+    "watchdogAclAllow": ["currentUserSid", "SYSTEM"],
+    "rejectRemotePipeClients": true,
+    "maximumIpcMessageBytes": 65536,
+    "coreEnvironmentPolicy": "allowlistNecessaryWindowsVariablesExcludeClashOverridesAndInheritedProxies"
+  },
+  "dns": {
+    "enable": true,
+    "enhancedMode": "redir-host",
+    "ipv6": false,
+    "bootstrapNameservers": ["223.5.5.5", "119.29.29.29"],
+    "proxyServerNameservers": ["223.5.5.5", "119.29.29.29"],
+    "directNameserver": "https://dns.alidns.com/dns-query#DIRECT",
+    "proxiedNameserver": "https://1.1.1.1/dns-query#<exitGroup>",
+    "cnPolicyOnlyInDomesticDirectPreset": true,
+    "directFallback": false,
+    "geoAutoUpdate": false,
+    "geodataMode": true
+  },
+  "limits": {
+    "subscriptionTimeoutSeconds": 20,
+    "subscriptionMaxRetries": 2,
+    "subscriptionRetryBackoffSeconds": [1, 2],
+    "subscriptionMaxDecodedBytes": 10485760,
+    "subscriptionMaxHttpsRedirects": 3,
+    "yamlMaxDepth": 32,
+    "yamlMaxNodes": 5000,
+    "yamlAliasesAllowed": false,
+    "yamlCustomTagsAllowed": false,
+    "socksAuthMinUtf8Bytes": 1,
+    "socksAuthMaxUtf8Bytes": 255
+  },
+  "probes": {
+    "httpsPrimary": "https://www.gstatic.com/generate_204",
+    "httpsFallback": "https://cp.cloudflare.com/generate_204",
+    "expectedHttpsStatus": 204,
+    "ipv4Primary": "https://api.ipify.org?format=json",
+    "ipv4Fallback": "https://www.cloudflare.com/cdn-cgi/trace",
+    "maximumIpResponseBytes": 4096,
+    "connectTimeoutSeconds": 3,
+    "requestTimeoutSeconds": 8,
+    "maximumFullChainCandidates": 3,
+    "maximumFullChainConcurrency": 3,
+    "connectionDeadlineSeconds": 30,
+    "frontIntervalSeconds": 300,
+    "chainIntervalSeconds": 60,
+    "exitIpIntervalSeconds": 300,
+    "consecutiveFailuresToDegrade": 3,
+    "inheritEnvironmentProxy": false,
+    "redirectsAllowed": false,
+    "tlsVerificationRequired": true,
+    "defaultsMeasured": false
+  },
+  "release": {
+    "format": "zip",
+    "standardPackageUsesInstalledWebview2": true,
+    "minimumInstalledWebview2": "157.0.4341.46",
+    "fullPackageIncludesFixedWebview2": true,
+    "upstreamAutoUpdaterEnabled": false,
+    "manifestSignature": "minisign",
+    "manifestVerificationDependency": "minisign-verify 0.3.0",
+    "windowsCodeSignature": "authenticodeSha256WithRfc3161Timestamp",
+    "publisherCertificateProvisioned": false,
+    "productSigningKeyProvisioned": false
+  },
+  "validation": {
+    "upstreamSourceRead": true,
+    "lockfilesParsed": true,
+    "artifactDownloadsHashed": true,
+    "githubArtifactDigestsMatched": true,
+    "webviewMainMicrosoftSignatureValid": true,
+    "visualStudioBootstrapperSignatureValid": true,
+    "visualStudioCatalogIntegrityPassed": true,
+    "nativeBuild": "passedPinnedMsvcComponentBuildWithExistingSdk",
+    "configurationTest": "passedOwnedLoopbackFixtures",
+    "realChainTest": "loopbackFixturePassedRemoteProviderMatrixNotRun",
+    "cleanVmAcceptance": "passedStandardUserSidecarFixedWebview",
+    "systemProxyModified": false,
+    "coreExecuted": true,
+    "toolchainInstalled": true,
+    "releaseReady": false,
+    "toolchainInstallationScope": "projectUserCacheNoGlobalPathChange",
+    "rustCheck": "passedWithClippyFeature",
+    "frontendTypecheck": "passed",
+    "frontendTests": {
+      "filesPassed": 10,
+      "testsPassed": 34
+    },
+    "isolatedChainTests": {
+      "testsPassed": 5,
+      "testsFailed": 0,
+      "scope": "loopbackSsFrontAndAuthenticatedSocks5Exit"
+    },
+    "coreExecutionScope": "ownedLoopbackSmokeFixturesOnly"
+  },
+  "releaseGates": [
+    {
+      "id": "trustedBuildToolchainLayout",
+      "status": "catalogAndCompilerAuthenticatedFullInstallerLayoutPending",
+      "reason": "Microsoft embedded signature and strict online certificate chain pass; four pinned MSVC payloads prepared and used in a successful baseline build. Original channel metadata mismatch is retained. Full installer layout remains unvalidated."
+    },
+    {
+      "id": "coreCorrespondingSourceMaterials",
+      "status": "buildInputsArchivedNotBitReproduced",
+      "reason": "Fixed mihomo source, workflow-referenced MetaCubeX Go SDK including compiler source, exact embedded CA bytes and build parameters are archived with hashes. Byte-identical rebuilding has not been demonstrated."
+    },
+    {
+      "id": "baselineNativeBuild",
+      "status": "passedPinnedMsvcComponentBuild",
+      "reason": "Baseline built with authenticated VS 17.14.44 MSVC components (14.44.35229) and existing Windows SDK 10.0.26100.0; full Visual Studio installer layout installation is not claimed."
+    },
+    {
+      "id": "realChainProtocolMatrix",
+      "status": "notRun"
+    },
+    {
+      "id": "portableCoexistenceAndRecovery",
+      "status": "notRun"
+    },
+    {
+      "id": "finalZipCleanVmAcceptance",
+      "status": "notRun"
+    },
+    {
+      "id": "publisherSigningAssets",
+      "status": "notProvisioned"
+    }
+  ],
+  "toolchainDownloads": {
+    "rustup": {
+      "url": "https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe",
+      "sha256": "38027d51d69a5d05493627a0634dbea52d6cd793c8f072d2373d3f4163eec7db"
+    },
+    "pnpm": {
+      "sha256": "da363262507ee4111efdc7f52f55e0404c2a833b258129b589571d6b3a804555",
+      "package": "@pnpm/exe.win32-x64@12.16.1",
+      "registry": "https://registry.npmjs.org/"
+    },
+    "node": {
+      "url": "https://nodejs.org/dist/v26.13.0/node-v26.13.0-win-x64.zip",
+      "sha256": "dcc60d59a0746999f99064a01c020445d54d84228c691cdbf25b49ac3b59150a",
+      "archiveName": "node-v26.13.0-win-x64.zip"
+    }
+  },
+  "implementation": {
+    "milestone": "M0",
+    "status": "m0AcceptancePassed",
+    "sourceBranch": "chaindesk/main",
+    "reuseAudit": "链式代理便携客户端-M0实施记录.md",
+    "logsDirectory": ".chaindesk/logs",
+    "applicationBusinessSourceModified": false,
+    "upstreamBuildAndUpdateCommandsModified": false,
+    "portableClientDelivered": false
+  },
+  "cleanVmEnvironment": {
+    "purpose": "M0ApplicationFeasibilityOnly",
+    "image": {
+      "fileName": "windows-11-enterprise-eval-26h2-en-us-x64.iso",
+      "url": "https://software-static.download.prss.microsoft.com/dbazure/26300.9457.260913-1737.26h2_ge_release_svc_refresh_CLIENTENTERPRISEEVAL_OEMRET_x64FRE_en-us.iso",
+      "size": 8225329152,
+      "sha256": "bc3f24086ebadc94489066b5ad78089e2cf5c3491e90e790bb81a2b199c10e38",
+      "hashSource": "https://support.microsoft.com/en-us/servicing/os/windows/docs/2026/09/verify-the-authenticity-of-a-windows-11-enterprise-evaluation-iso-file",
+      "version": "26H2",
+      "build": 26300
+    },
+    "qemu": {
+      "version": "11.1.0",
+      "installerUrl": "https://qemu.weilnetz.de/w64/qemu-w64-setup-20260811.exe",
+      "installerSha512": "5bcf9eed634e8575a37b74f445af41a2fe4106da512d0c30c368301d4c105037fdfab40a5287367a28a957624cddebbc8c07e16c88ab6634f554cdf3d16bf543",
+      "sha512Source": "https://qemu.weilnetz.de/w64/qemu-w64-setup-20260811.sha512",
+      "files": [
+        {
+          "path": "qemu-system-x86_64.exe",
+          "sha256": "47d57a6072e0bb3bd98f87926eb129eb1736dfe818c67b3b81ef7ce4edd0b3cd"
+        },
+        {
+          "path": "qemu-img.exe",
+          "sha256": "9d930582d0d574bb106d89982c547688e10b8f356192d302cc3d0ae4e8674534"
+        },
+        {
+          "path": "share/edk2-x86_64-code.fd",
+          "sha256": "33090cc07675baa5190d9f1e84bf5176b33bcbfa9bacac522961150cdb6dbb2a"
+        },
+        {
+          "path": "share/edk2-i386-vars.fd",
+          "sha256": "5d2ac383371b408398accee7ec27c8c09ea5b74a0de0ceea6513388b15be5d1e"
+        }
+      ]
+    },
+    "accelerator": "whpx",
+    "hostAdministratorRequired": false,
+    "guestTestUserIsAdministrator": false,
+    "guestNetworking": "userNatWithLoopbackController",
+    "guestPlatformSecurityAcceptance": false,
+    "guestPlatformExceptions": [
+      "No TPM backend in this QEMU Windows binary",
+      "Secure Boot is not enabled"
+    ],
+    "acceptanceStatus": "passed",
+    "acceptedAt": "2026-11-11T01:54:17.2891004Z",
+    "acceptedWindowsBuild": "26300.9457",
+    "acceptedApplicationSha256": "dea614487f913b59663aed464f4e144fce9188d1dcf79fc1d0099891d427ceaa",
+    "acceptedHarnessSha256": "6803521e5bc78317591d1b5731b20dbdc94d87cb0fc84f38e4f16d8edc81ff34"
+  }
+}

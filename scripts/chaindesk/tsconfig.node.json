@@ -1,0 +1,4 @@
+{
+  "extends": "../perf/tsconfig.node.json",
+  "include": ["./*.mjs"]
+}

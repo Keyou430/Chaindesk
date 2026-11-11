@@ -257,6 +257,16 @@ export default defineConfig([
     },
   },
   {
+    files: ['scripts/chaindesk/*.mjs'],
+    languageOptions: {
+      globals: globals.node,
+      parserOptions: {
+        projectService: false,
+        project: './scripts/chaindesk/tsconfig.node.json',
+      },
+    },
+  },
+  {
     files: ['src/**/*.{ts,tsx,js,jsx,mts,mjs}'],
     rules: ipcBoundaryRules(),
   },
