@@ -38,6 +38,13 @@ pub(super) async fn apply_verge_patch_locked(
     patch: &IVerge,
     not_save_file: bool,
 ) -> Result<()> {
+    #[cfg(windows)]
+    if patch.enable_system_proxy == Some(true) && !crate::config::chain::session::proxy_permitted() {
+        return Err(crate::config::chain::failure(
+            "CHAIN_NOT_VALIDATED",
+            "Use Detect and connect to validate the complete chain before enabling the system proxy.",
+        ));
+    }
     if cfg!(windows)
         && (patch.enable_tun_mode == Some(true)
             || patch.enable_auto_launch == Some(true)

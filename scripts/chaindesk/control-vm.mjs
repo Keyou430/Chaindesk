@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { X509Certificate } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -11,6 +12,10 @@ const { values } = parseArgs({
     login: { type: 'boolean' },
     launch: { type: 'boolean' },
     capture: { type: 'boolean' },
+    inspect: { type: 'boolean' },
+    ping: { type: 'boolean' },
+    processes: { type: 'boolean' },
+    'approve-fixture-ca': { type: 'boolean' },
     'prepare-shutdown': { type: 'boolean' },
   },
 })
@@ -37,6 +42,7 @@ async function key(...codes) {
   await delay(90)
 }
 async function type(text) {
+  assert.ok(text.length < 260, 'Guest Run commands must fit its 259-character input limit')
   const plain = {
     ' ': 'spc',
     '/': 'slash',
@@ -47,6 +53,8 @@ async function type(text) {
     ';': 'semicolon',
     ',': 'comma',
     "'": 'apostrophe',
+    '[': 'bracket_left',
+    ']': 'bracket_right',
   }
   const shifted = {
     '>': 'dot',
@@ -90,7 +98,50 @@ if (values.launch) {
   await delay(1500)
   await key('ctrl', 'a')
   await type(
-    `powershell -nop -ep bypass -c "irm ${control.controller}/boot.ps1|iex"`,
+    `powershell -nop -ep bypass -c "[Net.WebRequest]::DefaultWebProxy=$null;irm ${control.controller}/boot.ps1|iex"`,
+  )
+  await key('ret')
+}
+if (values.inspect) {
+  await key('esc')
+  await key('meta_l', 'r')
+  await delay(1500)
+  await key('ctrl', 'a')
+  await type(
+    `cmd /c curl.exe --noproxy 10.0.2.2 -fsS --max-time 5 -o C:\\M0\\i.ps1 ${control.controller}/vm-debugger.ps1 && powershell -nop -ep bypass -c ". C:\\M0\\i.ps1;Send-VmDiagnostic"`,
+  )
+  await key('ret')
+}
+if (values.ping) {
+  await key('esc')
+  await key('meta_l', 'r')
+  await delay(1500)
+  await key('ctrl', 'a')
+  await type(
+    `curl.exe --noproxy 10.0.2.2 --connect-timeout 3 --max-time 5 --data {} ${control.controller}/progress`,
+  )
+  await key('ret')
+}
+if (values.processes) {
+  await key('esc')
+  await key('meta_l', 'r')
+  await delay(1500)
+  await key('ctrl', 'a')
+  await type(
+    `cmd /c tasklist /fo csv > C:\\M0\\t.csv && curl.exe --noproxy 10.0.2.2 --max-time 5 --data-binary @C:\\M0\\t.csv ${control.controller}/progress`,
+  )
+  await key('ret')
+}
+if (values['approve-fixture-ca']) {
+  const certificate = new X509Certificate(
+    await readFile(path.join(control.runDirectory, 'tls-fixture/ca.pem')),
+  )
+  await key('esc')
+  await key('meta_l', 'r')
+  await delay(1500)
+  await key('ctrl', 'a')
+  await type(
+    `powershell -nop -ep bypass -c "[Net.WebRequest]::DefaultWebProxy=$null;irm ${control.controller}/vm-debugger.ps1|iex;Confirm-VmFixtureCertificate 0 '${certificate.fingerprint.replaceAll(':', '')}'"`,
   )
   await key('ret')
 }

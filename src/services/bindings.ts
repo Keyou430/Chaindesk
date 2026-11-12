@@ -10,6 +10,23 @@ export const commands = {
   exportDiagnosticInfo: () => __TAURI_INVOKE<null>('export_diagnostic_info'),
   probeListener: (request: ListenerProbe) =>
     __TAURI_INVOKE<ListenerProbeOutcome>('probe_listener', { request }),
+  getChainState: () => __TAURI_INVOKE<ChainView>('get_chain_state'),
+  importChainFile: (path: string) =>
+    __TAURI_INVOKE<ChainView>('import_chain_file', { path }),
+  importChainHttps: (url: string, localProxyPort: number | null) =>
+    __TAURI_INVOKE<ChainView>('import_chain_https', { url, localProxyPort }),
+  updateChainSubscription: (localProxyPort: number | null) =>
+    __TAURI_INVOKE<ChainView>('update_chain_subscription', { localProxyPort }),
+  saveChainExit: (input: ExitInput) =>
+    __TAURI_INVOKE<ChainView>('save_chain_exit', { input }),
+  forgetChainAuthentication: () =>
+    __TAURI_INVOKE<ChainView>('forget_chain_authentication'),
+  excludeChainFront: (id: string, excluded: boolean) =>
+    __TAURI_INVOKE<ChainView>('exclude_chain_front', { id, excluded }),
+  connectChain: (input: ConnectInput) =>
+    __TAURI_INVOKE<ChainView>('connect_chain', { input }),
+  disconnectChain: () => __TAURI_INVOKE<ChainView>('disconnect_chain'),
+  cancelChainConnection: () => __TAURI_INVOKE<null>('cancel_chain_connection'),
   saveProxyPorts: (settings: ProxyPortSettings) =>
     __TAURI_INVOKE<SaveProxyPortsOutcome>('save_proxy_ports', { settings }),
   getSysProxy: () => __TAURI_INVOKE<SystemProxy>('get_sys_proxy'),
@@ -234,6 +251,45 @@ export type AutoProxy = {
   url: string
 }
 
+export type ChainErrorView = {
+  code: string
+  message: string
+}
+
+export type ChainPhase =
+  | 'unconfigured'
+  | 'ready'
+  | 'probing'
+  | 'connecting'
+  | 'connected'
+  | 'degraded'
+  | 'disconnecting'
+  | 'disconnected'
+  | 'recoveryRequired'
+
+export type ChainView = {
+  phase: ChainPhase
+  fronts: FrontView[]
+  subscriptionName: string | null
+  subscriptionUpdatedAt: string | null
+  subscriptionHost: string | null
+  canUpdateSubscription: boolean
+  duplicates: number
+  host: string
+  port: number
+  rememberAuthentication: boolean
+  authenticationRequired: boolean
+  hasSessionAuthentication: boolean
+  hasSavedAuthentication: boolean
+  selectedFrontId: string | null
+  preset: RulePreset
+  probeConsent: boolean
+  backgroundChecks: boolean
+  observation: ProbeObservation | null
+  error: ChainErrorView | null
+  capabilityVersion: number
+}
+
 export type ClashInfo = {
   /**  clash core port */
   mixed_port: number
@@ -268,6 +324,13 @@ export type CommandFailure_Serialize = {
   detail: string
   /**  Requested operation when known by the command. */
   operation?: FailedOperation | null
+}
+
+export type ConnectInput = {
+  frontId: string
+  preset: RulePreset
+  probeConsent: boolean
+  backgroundChecks: boolean
 }
 
 /**  Why the Core is not running, kept until a Core starts again. */
@@ -305,12 +368,29 @@ export type DownloadEvent =
     }
   | { event: 'Finished' }
 
+export type ExitInput = {
+  host: string
+  port: number
+  username: string | null
+  password: string | null
+  remember: boolean
+}
+
 /**  Operation associated with a pending failure. */
 export type FailedOperation =
   | 'systemProxyEnable'
   | 'systemProxyDisable'
   | 'systemProxyRestore'
   | 'systemProxyGuard'
+
+export type FrontView = {
+  id: string
+  name: string
+  protocol: string
+  endpoint: string
+  rejection: string | null
+  excluded: boolean
+}
 
 /**  Define the `profiles.yaml` schema */
 export type IProfiles = IProfiles_Serialize | IProfiles_Deserialize
@@ -727,6 +807,13 @@ export type PrfSelected = {
   now?: string | null
 }
 
+export type ProbeObservation = {
+  ipv4: string
+  checkedAt: string
+  service: string
+  elapsedMs: number
+}
+
 export type ProfileCreate = ProfileCreate_Serialize | ProfileCreate_Deserialize
 
 export type ProfileCreate_Deserialize = {
@@ -935,6 +1022,8 @@ export type ProxyViewV1_Serialize = {
   standalone: string[]
   providers: ProxyProviderView_Serialize[]
 }
+
+export type RulePreset = 'chinaDirect' | 'allProxy'
 
 export type RunStateView = {
   mode: RunningMode

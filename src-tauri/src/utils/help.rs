@@ -131,6 +131,36 @@ pub async fn save_yaml_str(path: &Path, yaml_str: &str) -> Result<()> {
     Ok(())
 }
 
+#[cfg(windows)]
+pub(crate) fn save_private_bytes(path: &Path, bytes: &[u8]) -> Result<()> {
+    use std::io::Write as _;
+
+    let temporary = path.with_extension(format!("tmp-{}", super::server::random_token()?));
+    let cleanup = guard(temporary, |path| {
+        let _ = std::fs::remove_file(path);
+    });
+    let mut file = crate::core::owner_identity::create_private_current_user_file(&cleanup)?;
+    file.write_all(bytes)?;
+    file.sync_all()?;
+    drop(file);
+    std::fs::rename(cleanup.as_path(), path)?;
+    let _ = ScopeGuard::into_inner(cleanup);
+    Ok(())
+}
+
+#[cfg(windows)]
+pub(crate) fn read_private_bytes(path: &Path, limit: usize) -> Result<Vec<u8>> {
+    use std::io::Read as _;
+
+    let file = crate::core::owner_identity::read_private_current_user_file(path)?;
+    let mut bytes = Vec::new();
+    file.take(limit as u64 + 1).read_to_end(&mut bytes)?;
+    if bytes.len() > limit {
+        bail!("private data exceeds its size limit");
+    }
+    Ok(bytes)
+}
+
 const ALPHABET: [char; 62] = [
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
     'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',

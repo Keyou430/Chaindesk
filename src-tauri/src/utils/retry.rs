@@ -4,15 +4,32 @@ use std::{future::Future, num::NonZeroUsize, time::Duration};
 pub struct RetryPolicy {
     pub attempts: NonZeroUsize,
     delay: Duration,
+    multiplier: u32,
 }
 
 impl RetryPolicy {
     pub const fn fixed(attempts: NonZeroUsize, delay: Duration) -> Self {
-        Self { attempts, delay }
+        Self {
+            attempts,
+            delay,
+            multiplier: 1,
+        }
+    }
+
+    pub const fn exponential(attempts: NonZeroUsize, delay: Duration) -> Self {
+        Self {
+            attempts,
+            delay,
+            multiplier: 2,
+        }
     }
 
     fn delays(self) -> impl Iterator<Item = Duration> {
-        std::iter::repeat_n(self.delay, self.attempts.get() - 1)
+        (0..self.attempts.get() - 1).scan(self.delay, move |delay, _| {
+            let current = *delay;
+            *delay = delay.saturating_mul(self.multiplier);
+            Some(current)
+        })
     }
 }
 
@@ -110,6 +127,22 @@ pub fn retry_sync<T, E>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test(start_paused = true)]
+    async fn exponential_network_retries_wait_one_then_two_seconds() {
+        let started = tokio::time::Instant::now();
+        let mut observed = Vec::new();
+        let result = retry(
+            RetryPolicy::exponential(NonZeroUsize::MIN.saturating_add(2), Duration::from_secs(1)),
+            |attempt| {
+                observed.push(started.elapsed().as_secs());
+                async move { Err::<(), _>(RetryError::Retry(attempt)) }
+            },
+        )
+        .await;
+        assert_eq!(result, Err(2));
+        assert_eq!(observed, [0, 1, 3]);
+    }
 
     #[tokio::test]
     async fn retries_stop_at_success_terminal_error_or_attempt_limit() {

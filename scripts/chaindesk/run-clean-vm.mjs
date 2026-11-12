@@ -26,6 +26,8 @@ import {
   verifyFile,
   verifySource,
 } from './baseline.mjs'
+import { createVmSubscriptionFixture } from './vm-subscription-fixture.mjs'
+import { prepareVmTlsFixture } from './vm-tls-fixture.mjs'
 
 const { values } = parseArgs({
   options: {
@@ -36,10 +38,23 @@ const { values } = parseArgs({
     'original-app': { type: 'string' },
   },
 })
-assert.ok(['m0', 'm1'].includes(values.milestone), 'Unsupported VM milestone')
-const portable = values.milestone === 'm1'
+assert.ok(
+  ['m0', 'm1', 'm2', 'm3', 'm4'].includes(values.milestone),
+  'Unsupported VM milestone',
+)
+const portable = values.milestone !== 'm0'
+const chainScenario = ['m2', 'm3', 'm4'].includes(values.milestone)
+const portableHarnesses = [
+  'accept-portable-vm.ps1',
+  'vm-debugger.ps1',
+  ...(chainScenario ? ['chain-vm-scenario.ps1'] : []),
+]
 const reuseGuest = portable && values['base-evidence'] !== undefined
-const logPrefix = portable ? 'portable-vm' : 'clean-vm'
+const logPrefix = chainScenario
+  ? `${values.milestone}-vm`
+  : portable
+    ? 'portable-vm'
+    : 'clean-vm'
 const baseline = await readBaseline()
 await verifySource(baseline)
 const environment = baseline.cleanVmEnvironment
@@ -59,6 +74,8 @@ for (const file of environment.qemu.files) {
 }
 await mkdir(cache, { recursive: true })
 const runDirectory = await mkdtemp(path.join(cache, `${values.milestone}-`))
+const tlsFixtureDirectory = path.join(runDirectory, 'tls-fixture')
+if (chainScenario) await prepareVmTlsFixture(tlsFixtureDirectory)
 const answerDirectory = path.join(runDirectory, 'answer')
 await mkdir(path.join(answerDirectory, 'M0'), { recursive: true })
 const logDirectory = path.join(projectRoot, '.chaindesk', 'logs')
@@ -69,12 +86,12 @@ let backingRun
 if (portable) {
   const pointer = JSON.parse(
     await readFile(
-      path.join(projectRoot, '.chaindesk/m1-package.json'),
+      path.join(projectRoot, `.chaindesk/${values.milestone}-package.json`),
       'utf8',
     ),
   )
   manifest = JSON.parse(await readFile(pointer.manifestPath, 'utf8'))
-  assert.equal(manifest.milestone, 'M1')
+  assert.equal(manifest.milestone, values.milestone.toUpperCase())
   manifest.originalApplicationSha256 =
     baseline.cleanVmEnvironment.acceptedApplicationSha256
   const original = path.resolve(
@@ -170,6 +187,9 @@ await writeFile(
   `${JSON.stringify(manifest, null, 2)}\n`,
 )
 const nonce = randomBytes(24).toString('hex')
+const subscriptionFixture = chainScenario
+  ? await createVmSubscriptionFixture(tlsFixtureDirectory, nonce)
+  : undefined
 let complete
 const completion = new Promise((resolve) => {
   complete = resolve
@@ -186,9 +206,7 @@ const server = http.createServer(async (request, response) => {
     } else if (
       request.method === 'GET' &&
       portable &&
-      ['boot.ps1', 'accept-portable-vm.ps1', 'vm-debugger.ps1'].includes(
-        resource,
-      )
+      ['boot.ps1', ...portableHarnesses].includes(resource)
     ) {
       const content =
         resource === 'boot.ps1'
@@ -197,11 +215,11 @@ const server = http.createServer(async (request, response) => {
               "if ($env:COMPUTERNAME -ne 'CHAINDESK-M0' -or (Get-CimInstance Win32_ComputerSystem).Manufacturer -notmatch 'QEMU') { throw 'Disposable guest required' }",
               'New-Item -ItemType Directory -Force C:\\M0\\M1 | Out-Null',
               "[IO.File]::WriteAllText('C:\\M0\\accept-clean-vm.ps1', 'exit')",
-              ...['accept-portable-vm.ps1', 'vm-debugger.ps1'].map(
+              ...portableHarnesses.map(
                 (file) =>
                   `Invoke-WebRequest -UseBasicParsing -Uri '${controller}/${file}' -OutFile 'C:\\M0\\M1\\${file}'`,
               ),
-              `& 'C:\\M0\\M1\\accept-portable-vm.ps1' -Controller '${controller}'`,
+              `& 'C:\\M0\\M1\\accept-portable-vm.ps1' -Controller '${controller}' -Milestone '${values.milestone}'`,
             ].join('\r\n')
           : await readFile(
               path.join(projectRoot, 'scripts/chaindesk', resource),
@@ -210,6 +228,32 @@ const server = http.createServer(async (request, response) => {
       response
         .writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' })
         .end(content)
+    } else if (
+      request.method === 'GET' &&
+      chainScenario &&
+      ['tls-ca.pem', 'tls-server.pem', 'tls-server.key'].includes(resource)
+    ) {
+      const names = {
+        'tls-ca.pem': 'ca.pem',
+        'tls-server.pem': 'server.pem',
+        'tls-server.key': 'server.key',
+      }
+      response
+        .writeHead(200, { 'Content-Type': 'application/octet-stream' })
+        .end(await readFile(path.join(tlsFixtureDirectory, names[resource])))
+    } else if (
+      chainScenario &&
+      resource === 'subscription-fixture' &&
+      ['GET', 'POST'].includes(request.method)
+    ) {
+      if (request.method === 'POST')
+        await subscriptionFixture.setSource(request)
+      response.writeHead(200, { 'Content-Type': 'application/json' }).end(
+        JSON.stringify({
+          url: subscriptionFixture.url,
+          requests: subscriptionFixture.requests,
+        }),
+      )
     } else if (
       request.method === 'POST' &&
       portable &&
@@ -228,9 +272,16 @@ const server = http.createServer(async (request, response) => {
         input.execute === 'screendump'
           ? { filename: path.join(runDirectory, 'latest-screen.ppm') }
           : input.arguments
+      let output
+      try {
+        output = await command(input.execute, args)
+      } catch (error) {
+        response.writeHead(400).end(String(error))
+        return
+      }
       response
         .writeHead(200, { 'Content-Type': 'application/json' })
-        .end(JSON.stringify(await command(input.execute, args)))
+        .end(JSON.stringify(output))
     } else if (
       request.method === 'GET' &&
       [
@@ -281,7 +332,10 @@ const server = http.createServer(async (request, response) => {
       response.writeHead(404).end()
     }
   } catch (error) {
-    response.writeHead(500).end(String(error))
+    console.error('Disposable VM controller request failed:', String(error))
+    if (!response.headersSent) response.writeHead(500)
+    if (!response.writableEnded)
+      response.end('Disposable VM controller request failed')
     complete({ passed: false, error: String(error) })
   }
 })
@@ -314,6 +368,11 @@ if (!reuseGuest) {
     path.join(projectRoot, 'scripts/chaindesk/vm-debugger.ps1'),
     path.join(acceptanceDirectory, 'vm-debugger.ps1'),
   )
+  if (chainScenario)
+    await copyFile(
+      path.join(projectRoot, 'scripts/chaindesk/chain-vm-scenario.ps1'),
+      path.join(acceptanceDirectory, 'chain-vm-scenario.ps1'),
+    )
   const guestHarness = `C:\\M0\\${portable ? 'M1\\' : ''}${harness}`
   await writeFile(
     path.join(answerDirectory, 'M0', 'prepare.cmd'),
@@ -324,7 +383,7 @@ if (!reuseGuest) {
       'mkdir C:\\M0',
       'xcopy "%~dp0*" C:\\M0\\ /E /I /Y',
       'icacls C:\\M0 /grant "*S-1-5-32-545:(OI)(CI)M" /T',
-      `reg.exe add HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run /v M0Acceptance /t REG_SZ /d "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${guestHarness} -Controller ${controller}" /f`,
+      `reg.exe add HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run /v M0Acceptance /t REG_SZ /d "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${guestHarness} -Controller ${controller}${portable ? ` -Milestone ${values.milestone}` : ''}" /f`,
     ].join('\r\n'),
   )
   const template = await readFile(
@@ -574,5 +633,6 @@ try {
   monitor?.destroy()
   qmpServer.close()
   server.close()
+  subscriptionFixture?.close()
   log.end()
 }

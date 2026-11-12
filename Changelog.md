@@ -1,3 +1,14 @@
+## ChainDesk M2 (development)
+
+<details>
+<summary><strong> ✨ 新增功能 </strong></summary>
+
+**🖥️ Windows**
+
+- Windows：新增订阅导入、固定出口整链连接与断开，以及可选的本机加密凭证保存
+
+</details>
+
 ## ChainDesk M1 (development)
 
 <details>

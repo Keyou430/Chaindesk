@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "baselineVersion": 4,
+  "baselineVersion": 5,
   "confirmedOn": "2026-11-12",
   "timezone": "Asia/Shanghai",
   "purpose": "implementationBaselineNotReleaseAcceptance",
@@ -701,19 +701,39 @@
     }
   },
   "implementation": {
-    "milestone": "M1",
-    "status": "portableSkeletonAcceptancePassed",
+    "milestone": "M2",
+    "status": "minimalWorkflowAcceptancePassed",
     "sourceBranch": "chaindesk/main",
-    "reuseAudit": "链式代理便携客户端-M1实施与验收.md",
+    "reuseAudit": "链式代理便携客户端-M2实施与验收.md",
     "logsDirectory": ".chaindesk/logs",
     "applicationBusinessSourceModified": true,
     "upstreamBuildAndUpdateCommandsModified": true,
     "portableClientDelivered": true,
-    "deliveryScope": "M1DevelopmentSkeletonNotFinalRelease",
-    "localTrackingApproval": "approvedInChatOn2026-11-11",
+    "deliveryScope": "M2DevelopmentWorkflowNotFinalRelease",
+    "localTrackingApproval": "remainingPlanAuthorizedInChatOn2026-11-12",
     "m0Commit": "fc1f269bb3e5df1460207530d2c89b2d2a623485",
     "m0Tag": "chaindesk-m0-20261111",
-    "milestoneTag": "chaindesk-m1-20261112"
+    "milestoneTag": "chaindesk-m2-20261112",
+    "customLockfiles": {
+      "Cargo.lock": {
+        "sha256": "768a2b5a705809fb2708098b47c2b1ac7091a85040eb0720c284250ab34cdc99",
+        "reason": "Reference locked unsafe-libyaml 0.2.11 directly for pre-deserialization safety; enable cancellation on existing tokio-util 0.7.20. No package versions change."
+      }
+    },
+    "m1Commit": "80585289b345ddd79b108ba0fc2d680c874c2b3e",
+    "m1Tag": "chaindesk-m1-20261112",
+    "m2Acceptance": {
+      "vmEvidence": ".chaindesk/logs/m2-vm-evidence.json",
+      "vmChecksPassed": 85,
+      "verifiedProtocolProfiles": 8,
+      "guestPoweredOff": true,
+      "archiveSha256": "6e3d772ac14214a30ec803733ad968adabf72c24c9b73e998171968340c6499c",
+      "sourceFingerprint": "a07e0c5b39ef2280dfde884ab5b8e35a5a7a38d31b82289ff37d12c7d73b9747",
+      "applicationSha256": "a26ae28023abceba0c44285b0bc3e8b195ca2c16c6bd158eaffab5fd38db9ed0",
+      "isolatedDiagnosticsAccepted": false,
+      "persistentRecoveryAccepted": false,
+      "publisherSigningAccepted": false
+    }
   },
   "cleanVmEnvironment": {
     "purpose": "M0ApplicationFeasibilityOnly",

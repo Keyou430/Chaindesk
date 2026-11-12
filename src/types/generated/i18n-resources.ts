@@ -38,6 +38,56 @@ export interface TranslationResources {
       }
     }
     home: {
+      chain: {
+        allProxy: string
+        authentication: string
+        background: string
+        cancel: string
+        capability: string
+        chinaDirect: string
+        choose: string
+        connect: string
+        consent: string
+        coverage: string
+        disconnect: string
+        empty: string
+        exclude: string
+        exit: string
+        forget: string
+        front: string
+        host: string
+        importFile: string
+        importUrl: string
+        include: string
+        loading: string
+        localProxy: string
+        notObserved: string
+        observed: string
+        password: string
+        phases: {
+          connected: string
+          connecting: string
+          degraded: string
+          disconnected: string
+          disconnecting: string
+          probing: string
+          ready: string
+          recoveryRequired: string
+          unconfigured: string
+        }
+        port: string
+        privacy: string
+        remember: string
+        reuse: string
+        rules: string
+        saved: string
+        settings: string
+        subscription: string
+        title: string
+        update: string
+        url: string
+        username: string
+      }
       components: {
         clashInfo: {
           fields: {
@@ -1589,6 +1639,7 @@ export interface TranslationResources {
           noDisney: string
           originalsOnly: string
           pending: string
+          risky: string
           unsupportedRegion: string
           yes: string
         }

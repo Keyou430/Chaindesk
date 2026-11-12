@@ -179,14 +179,51 @@ pub(crate) fn constrain_config(config: &mut Mapping) -> Result<()> {
         "tun".into(),
         Value::Mapping(Mapping::from_iter([("enable".into(), false.into())])),
     );
-    if let Some(dns) = config.get_mut("dns").and_then(Value::as_mapping_mut) {
+    config.insert("mode".into(), "rule".into());
+    if crate::config::chain::store::active().is_none()
+        && let Some(dns) = config.get_mut("dns").and_then(Value::as_mapping_mut)
+    {
         dns.insert("enable".into(), false.into());
     }
     Ok(())
 }
 
 pub(crate) fn redact_config(config: &mut Mapping) {
-    config.remove("secret");
+    config.retain(|key, value| {
+        if key.as_str().is_some_and(|key| {
+            matches!(
+                key,
+                "secret" | "password" | "username" | "uuid" | "private-key" | "token" | "headers"
+            )
+        }) {
+            return false;
+        }
+        redact_value(value);
+        true
+    });
+}
+
+fn redact_value(value: &mut Value) {
+    match value {
+        Value::Mapping(map) => redact_config(map),
+        Value::Sequence(sequence) => sequence.iter_mut().for_each(redact_value),
+        _ => {}
+    }
+}
+
+pub(crate) fn clear_runtime_configuration() -> Result<()> {
+    for name in [
+        crate::constants::files::RUNTIME_CONFIG,
+        crate::constants::files::CHECK_CONFIG,
+    ] {
+        let path = controller()?.directory.join(name);
+        match std::fs::remove_file(path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn cleanup() -> Result<()> {
@@ -201,6 +238,17 @@ pub(crate) fn unsupported_command(command: &str) -> bool {
     matches!(
         command,
         "install_service"
+            | "patch_clash_config"
+            | "patch_clash_mode"
+            | "update_proxy_chain_config_in_runtime"
+            | "create_profile"
+            | "import_profile"
+            | "update_profile"
+            | "save_profile_file"
+            | "patch_profiles_config"
+            | "patch_profile"
+            | "delete_profile"
+            | "enhance_profiles"
             | "uninstall_service"
             | "reinstall_service"
             | "repair_service"

@@ -1,4 +1,6 @@
 mod backup;
+#[cfg(windows)]
+pub(crate) mod chain;
 mod clash;
 mod config;
 mod core_upgrade;

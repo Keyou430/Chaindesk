@@ -1,4 +1,6 @@
 use anyhow::Result;
+mod chain;
+pub(crate) use chain::*;
 use smartstring::alias::String;
 
 pub type CmdResult<T = ()> = Result<T, CommandFailure>;

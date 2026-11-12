@@ -16,11 +16,14 @@ import ProxiesSvg from '@/assets/image/itemicon/proxies.svg?react'
 import RulesSvg from '@/assets/image/itemicon/rules.svg?react'
 import SettingsSvg from '@/assets/image/itemicon/settings.svg?react'
 import UnlockSvg from '@/assets/image/itemicon/unlock.svg?react'
+import getSystem from '@/utils/get-system'
 
 import { navigationItems } from './_navigation-meta'
+import ChainPage from './chain'
 import ConnectionsPage from './connections'
 import HomePage from './home'
 import LogsPage from './logs'
+import PortableSettingsPage from './portable-settings'
 import ProfilePage from './profiles'
 import ProxyPage from './proxies'
 import RulesPage from './rules'
@@ -34,11 +37,18 @@ type NavigationItem = {
   Component: ComponentType
 }
 
+const isPortable = getSystem() === 'windows'
+const portablePaths = new Set<string>([
+  navigationItems.home.path,
+  navigationItems.logs.path,
+  navigationItems.settings.path,
+])
+
 export const navItems: NavigationItem[] = [
   {
     ...navigationItems.home,
     icon: [<HomeOutlinedIcon key="mui" />, <HomeSvg key="svg" />],
-    Component: HomePage,
+    Component: isPortable ? ChainPage : HomePage,
   },
   {
     ...navigationItems.proxies,
@@ -73,6 +83,6 @@ export const navItems: NavigationItem[] = [
   {
     ...navigationItems.settings,
     icon: [<SettingsOutlinedIcon key="mui" />, <SettingsSvg key="svg" />],
-    Component: SettingPage,
+    Component: isPortable ? PortableSettingsPage : SettingPage,
   },
-]
+].filter((item) => !isPortable || portablePaths.has(item.path))

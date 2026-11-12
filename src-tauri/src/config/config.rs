@@ -240,6 +240,21 @@ impl Config {
     }
 
     pub(crate) async fn generate_with_profiles(profiles: &IProfiles) -> Result<()> {
+        #[cfg(windows)]
+        if cfg!(windows) {
+            let mut config = match super::chain::store::active() {
+                Some(mapping) => (*mapping).clone(),
+                None => super::chain::builder::blocked(MixedPort::desired().await),
+            };
+            crate::core::portable::constrain_config(&mut config)?;
+            Self::runtime().await.edit_draft(|draft| {
+                *draft = IRuntime {
+                    config: Some(config),
+                    ..IRuntime::default()
+                };
+            });
+            return Ok(());
+        }
         let (mut config, exists_keys, logs, dns_override) = enhance::enhance(profiles).await?;
 
         resolve_provider_path_conflicts(&mut config, &dirs::app_home_dir()?)?;

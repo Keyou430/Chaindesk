@@ -434,6 +434,7 @@ impl IVerge {
 
     #[cfg(windows)]
     fn apply_portable_defaults(&mut self) {
+        self.enable_system_proxy = Some(false);
         self.enable_tun_mode = Some(false);
         self.enable_auto_launch = Some(false);
         self.enable_proxy_guard = Some(false);

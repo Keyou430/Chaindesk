@@ -26,6 +26,7 @@ import { UpdateViewer } from './mods/update-viewer'
 
 interface Props {
   onError?: (err: Error) => void
+  compact?: boolean
 }
 
 const OS = getSystem()
@@ -51,7 +52,7 @@ const languageOptions = supportedLanguages.map((code) => {
   return { code, label }
 })
 
-const SettingVergeBasic = ({ onError }: Props) => {
+const SettingVergeBasic = ({ onError, compact = false }: Props) => {
   const { t } = useTranslation()
 
   const { verge, patchVerge, mutateVerge } = useVerge()
@@ -90,16 +91,8 @@ const SettingVergeBasic = ({ onError }: Props) => {
     }
   }, [])
 
-  return (
-    <SettingList title={t('settings.components.verge.basic.title')}>
-      <ThemeViewer ref={themeRef} />
-      <ConfigViewer ref={configRef} />
-      <HotkeyViewer ref={hotkeyRef} />
-      <MiscViewer ref={miscRef} />
-      <LayoutViewer ref={layoutRef} />
-      {OS !== 'windows' && <UpdateViewer ref={updateRef} />}
-      <BackupViewer ref={backupRef} />
-
+  const preferenceFields = (
+    <>
       <SettingItem label={t('settings.components.verge.basic.fields.language')}>
         <GuardState
           value={language ?? 'en'}
@@ -130,6 +123,28 @@ const SettingVergeBasic = ({ onError }: Props) => {
           <ThemeModeSwitch />
         </GuardState>
       </SettingItem>
+    </>
+  )
+
+  if (compact) {
+    return (
+      <SettingList title={t('settings.components.verge.basic.title')}>
+        {preferenceFields}
+      </SettingList>
+    )
+  }
+
+  return (
+    <SettingList title={t('settings.components.verge.basic.title')}>
+      <ThemeViewer ref={themeRef} />
+      <ConfigViewer ref={configRef} />
+      <HotkeyViewer ref={hotkeyRef} />
+      <MiscViewer ref={miscRef} />
+      <LayoutViewer ref={layoutRef} />
+      {OS !== 'windows' && <UpdateViewer ref={updateRef} />}
+      <BackupViewer ref={backupRef} />
+
+      {preferenceFields}
 
       {OS !== 'linux' && (
         <SettingItem

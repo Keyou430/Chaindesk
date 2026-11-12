@@ -63,6 +63,11 @@ pub(crate) fn open_private_current_user_file(path: &Path) -> Result<std::fs::Fil
 }
 
 #[cfg(windows)]
+pub(crate) fn read_private_current_user_file(path: &Path) -> Result<std::fs::File> {
+    windows_owner::read_private_file(path)
+}
+
+#[cfg(windows)]
 pub(crate) fn open_or_create_current_user_lock(path: &Path) -> Result<std::fs::File> {
     windows_owner::open_or_create_lock_file(path)
 }
@@ -238,6 +243,14 @@ mod windows_owner {
         let sid = current_sid()?;
         let descriptor = LocalSecurityDescriptor::from_sid(&sid)?;
         let file = open_file(path)?;
+        validate_private_file(&file, descriptor.owner()?)?;
+        Ok(file)
+    }
+
+    pub(super) fn read_private_file(path: &Path) -> Result<std::fs::File> {
+        let sid = current_sid()?;
+        let descriptor = LocalSecurityDescriptor::from_sid(&sid)?;
+        let file = open_no_reparse(path, false, GENERIC_READ | READ_CONTROL)?;
         validate_private_file(&file, descriptor.owner()?)?;
         Ok(file)
     }

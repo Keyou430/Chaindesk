@@ -25,8 +25,13 @@ import {
 } from './baseline.mjs'
 
 const { values } = parseArgs({
-  options: { full: { type: 'boolean', default: false } },
+  options: {
+    full: { type: 'boolean', default: false },
+    milestone: { type: 'string', default: 'm1' },
+  },
 })
+assert.ok(['m1', 'm2', 'm3', 'm4'].includes(values.milestone))
+const milestone = values.milestone.toUpperCase()
 const baseline = await readBaseline()
 await verifySource(baseline)
 const configuration = JSON.parse(
@@ -36,7 +41,7 @@ assert.equal(configuration.identifier, 'local.chaindesk.portable')
 const cache = path.join(homedir(), '.cache/chaindesk')
 const releases = path.join(projectRoot, '.chaindesk/releases')
 await mkdir(releases, { recursive: true })
-const output = await mkdtemp(path.join(releases, 'm1-dev-'))
+const output = await mkdtemp(path.join(releases, `${values.milestone}-dev-`))
 const product = path.join(output, 'ChainDesk')
 await mkdir(path.join(product, 'core'), { recursive: true })
 await mkdir(path.join(product, 'resources/rules'), { recursive: true })
@@ -94,7 +99,7 @@ files.sort((left, right) => left.path.localeCompare(right.path))
 assert.ok(files.every((file) => !file.path.startsWith('ChainDesk/data/')))
 const archivePath = path.join(
   output,
-  `ChainDesk-M1-dev-${values.full ? 'full' : 'standard'}.zip`,
+  `ChainDesk-${milestone}-dev-${values.full ? 'full' : 'standard'}.zip`,
 )
 const archive = new AdmZip()
 archive.addLocalFolder(product, 'ChainDesk')
@@ -127,6 +132,7 @@ const sourcePaths = execFileSync(
 )
   .split('\0')
   .filter(Boolean)
+  .sort()
 const sourceFiles = []
 for (const file of sourcePaths)
   sourceFiles.push({
@@ -134,7 +140,7 @@ for (const file of sourcePaths)
     sha256: await hash(path.join(projectRoot, file)),
   })
 const manifest = {
-  milestone: 'M1',
+  milestone,
   developmentOnly: true,
   productDirectory: 'ChainDesk',
   fullRuntime: values.full,
@@ -154,7 +160,7 @@ await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, {
   flag: 'wx',
 })
 await writeFile(
-  path.join(projectRoot, '.chaindesk/m1-package.json'),
+  path.join(projectRoot, `.chaindesk/${values.milestone}-package.json`),
   `${JSON.stringify({ manifestPath, archivePath, outputDirectory: output }, null, 2)}\n`,
 )
 console.log(

@@ -1,6 +1,7 @@
 pub mod auto_backup;
 pub mod autostart;
 pub mod backup;
+pub(crate) mod chain_probe;
 pub mod hotkey;
 pub mod lightweight;
 pub mod listener;

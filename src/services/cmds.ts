@@ -6,6 +6,8 @@ import { debugLog } from '@/utils/debug'
 
 import { commands } from './bindings'
 import type {
+  ConnectInput,
+  ExitInput,
   DownloadEvent,
   JsonValue,
   ListenerProbe,
@@ -16,6 +18,22 @@ import type {
   ProfilePatch,
   ProfileCreate,
 } from './bindings'
+
+export const getChainState = () => commands.getChainState()
+export const importChainFile = (path: string) => commands.importChainFile(path)
+export const importChainHttps = (url: string, localProxyPort: number | null) =>
+  commands.importChainHttps(url, localProxyPort)
+export const updateChainSubscription = (localProxyPort: number | null) =>
+  commands.updateChainSubscription(localProxyPort)
+export const saveChainExit = (input: ExitInput) => commands.saveChainExit(input)
+export const forgetChainAuthentication = () =>
+  commands.forgetChainAuthentication()
+export const excludeChainFront = (id: string, excluded: boolean) =>
+  commands.excludeChainFront(id, excluded)
+export const connectChain = (input: ConnectInput) =>
+  commands.connectChain(input)
+export const disconnectChain = () => commands.disconnectChain()
+export const cancelChainConnection = () => commands.cancelChainConnection()
 
 export type {
   RunningMode,

@@ -1,7 +1,8 @@
-param([Parameter(Mandatory = $true)][string]$Controller)
+param([Parameter(Mandatory = $true)][string]$Controller, [ValidateSet('m1', 'm2', 'm3', 'm4')][string]$Milestone = 'm1')
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+[Net.WebRequest]::DefaultWebProxy = $null
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 $machine = Get-CimInstance Win32_ComputerSystem
 if ($env:COMPUTERNAME -ne 'CHAINDESK-M0' -or $machine.Manufacturer -notmatch 'QEMU' -or $PSScriptRoot -ne 'C:\M0\M1') {
@@ -11,7 +12,8 @@ $endpoint = [Uri]$Controller
 if ($endpoint.Scheme -ne 'http' -or $endpoint.Host -ne '10.0.2.2' -or $endpoint.Port -lt 1024) { throw 'Invalid guest controller' }
 . (Join-Path $PSScriptRoot 'vm-debugger.ps1')
 $requestId = 0
-$result = [ordered]@{ passed = $false; milestone = 'M1'; checks = @() }
+$result = [ordered]@{ passed = $false; milestone = $Milestone.ToUpperInvariant(); checks = @() }
+$fixtureProcesses = @()
 $result.harnessSha256 = (Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash.ToLowerInvariant()
 $original = $null
 $application = $null
@@ -26,7 +28,7 @@ function Confirm-Check([bool]$Condition, [string]$Name) {
     if (-not $Condition) { throw $Name }
     $script:result.checks += $Name
     $progress = @{ phase = $Name; checks = $script:result.checks.Count } | ConvertTo-Json -Compress
-    Invoke-WebRequest -UseBasicParsing -Method Post -Uri "$Controller/progress" -ContentType 'application/json' -Body $progress -TimeoutSec 10 | Out-Null
+    Send-VmEvidence "$Controller/progress" ([Text.Encoding]::UTF8.GetBytes($progress))
 }
 
 function Connect-Application([Diagnostics.Process]$Process, [int]$Port) {
@@ -208,6 +210,11 @@ try {
     $originalCoreId = $originalCore[0].ProcessId
     $originalPort = Invoke-DebuggerExpression "window.__TAURI_INTERNALS__.invoke('get_clash_info').then(x => x.mixed_port)" $originalSocket
     $originalFingerprint = Get-OriginalFingerprint
+    if ($Milestone -ne 'm1') {
+        $scenario = Join-Path $PSScriptRoot 'chain-vm-scenario.ps1'
+        $result.scenarioSha256 = (Get-FileHash -LiteralPath $scenario -Algorithm SHA256).Hash.ToLowerInvariant()
+        . $scenario
+    } else {
     $raceReady = Join-Path $caseRoot 'port-race-ready'
     $raceBound = Join-Path $caseRoot 'port-race-bound.json'
     $portRaceJob = Start-Job -ArgumentList $root, $raceReady, $raceBound -ScriptBlock {
@@ -366,7 +373,8 @@ try {
     Set-Acl -LiteralPath $readOnly -AclObject $restrictedAcl
     Confirm-StartupRefusal (Join-Path $readOnly 'ChainDesk.exe') 'not writable'
     Confirm-Check (-not (Test-Path -LiteralPath (Join-Path $readOnly 'data')) -and -not (Test-Path -LiteralPath (Join-Path $env:APPDATA 'local.chaindesk.portable'))) 'Unwritable location creates no fallback data'
-    Start-Product $root
+    }
+    if (-not $application -or $application.HasExited) { Start-Product $root }
     Add-Type -AssemblyName System.Windows.Forms, System.Drawing
     $screen = [Windows.Forms.Screen]::PrimaryScreen.Bounds
     $bitmap = [Drawing.Bitmap]::new($screen.Width, $screen.Height)
@@ -377,7 +385,7 @@ try {
         $bitmap.Save($image, [Drawing.Imaging.ImageFormat]::Png)
         $image.Position = 0
         $result.screenshotSha256 = (Get-FileHash -InputStream $image -Algorithm SHA256).Hash.ToLowerInvariant()
-        Invoke-WebRequest -UseBasicParsing -Method Post -Uri "$Controller/screenshot" -ContentType 'image/png' -Body $image.ToArray() -TimeoutSec 30 | Out-Null
+        Send-VmEvidence "$Controller/screenshot" ($image.ToArray()) 'image/png'
     } finally { $image.Dispose(); $graphics.Dispose(); $bitmap.Dispose() }
     Stop-Application $application $socket
     $socket = $null
@@ -387,6 +395,12 @@ try {
 } catch {
     $result.error = $_.Exception.Message
     $result.scriptStack = $_.ScriptStackTrace
+    if ($Milestone -ne 'm1') {
+        $result.fixtureLogTails = @(foreach ($fixture in @('front-fixture', 'exit-fixture')) {
+            $path = Join-Path $caseRoot "$fixture\stdout.log"
+            if (Test-Path -LiteralPath $path) { @{ name = $fixture; lines = @(Get-Content -LiteralPath $path -Encoding UTF8 -Tail 20 | ForEach-Object { [string]$_ }) } }
+        })
+    }
     if ($originalData) {
         $result.originalLogTails = @(Get-ChildItem -LiteralPath (Join-Path $originalData 'logs') -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 2 | ForEach-Object {
             @{ name = $_.Name; lines = @(Get-Content -LiteralPath $_.FullName -Encoding UTF8 -Tail 65 -ErrorAction SilentlyContinue | ForEach-Object { [string]$_ }) }
@@ -400,11 +414,11 @@ try {
 } finally {
     if ($portRaceJob) { Stop-Job $portRaceJob; Remove-Job $portRaceJob }
     foreach ($debugger in @($socket, $originalSocket)) { if ($debugger) { $debugger.Dispose() } }
-    foreach ($process in @($application, $original)) { if ($process -and -not $process.HasExited) { $process.Kill(); $process.WaitForExit() } }
+    foreach ($process in @($application, $original) + @($fixtureProcesses)) { if ($process -and -not $process.HasExited) { $process.Kill(); $process.WaitForExit() } }
     $result.finishedAt = [DateTime]::UtcNow.ToString('o')
     $json = $result | ConvertTo-Json -Depth 10
     [IO.File]::WriteAllText((Join-Path $PSScriptRoot 'result.json'), $json, [Text.UTF8Encoding]::new($false))
-    Invoke-WebRequest -UseBasicParsing -Method Post -Uri "$Controller/result" -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($json)) -TimeoutSec 30 | Out-Null
+    Send-VmEvidence "$Controller/result" ([Text.Encoding]::UTF8.GetBytes($json))
     & shutdown.exe /s /t 0
 }
 if (-not $result.passed) { exit 1 }

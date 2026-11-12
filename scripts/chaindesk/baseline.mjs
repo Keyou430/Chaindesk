@@ -74,7 +74,8 @@ export async function verifySource(baseline) {
   for (const filePath of ['pnpm-lock.yaml', 'Cargo.lock']) {
     await verifyFile(
       new URL(`../../${filePath}`, import.meta.url),
-      baseline.source.files[filePath].sha256,
+      baseline.implementation.customLockfiles?.[filePath]?.sha256 ??
+        baseline.source.files[filePath].sha256,
     )
   }
 }
