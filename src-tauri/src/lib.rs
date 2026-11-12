@@ -11,7 +11,6 @@ pub mod ipc;
 mod process;
 pub mod utils;
 
-use crate::constants::files;
 use crate::{
     core::handle,
     process::AsyncHandler,
@@ -19,17 +18,25 @@ use crate::{
 };
 use anyhow::Result;
 use clash_verge_logging::{Type, logging};
-use std::sync::OnceLock;
+use std::sync::{
+    OnceLock,
+    atomic::{AtomicUsize, Ordering},
+};
 use tauri::{AppHandle, Manager as _};
-#[cfg(target_os = "macos")]
-use tauri_plugin_autostart::MacosLauncher;
-use tauri_plugin_deep_link::DeepLinkExt as _;
 
 pub static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 
 /// Application initialization helper functions
 mod app_init {
-    use super::*;
+    use super::{AsyncHandler, Result, Type, core, logging, server};
+    #[cfg(not(windows))]
+    use crate::{constants::files, utils::resolve};
+    #[cfg(not(windows))]
+    use tauri::Manager as _;
+    #[cfg(target_os = "macos")]
+    use tauri_plugin_autostart::MacosLauncher;
+    #[cfg(not(windows))]
+    use tauri_plugin_deep_link::DeepLinkExt as _;
 
     /// Initialize singleton monitoring for other instances
     pub fn init_singleton_check() -> Result<server::SingletonDisposition> {
@@ -45,14 +52,6 @@ mod app_init {
         let mut builder = builder
             .plugin(tauri_plugin_clash_verge_sysinfo::init())
             .plugin(tauri_plugin_notification::init())
-            .plugin(
-                tauri_plugin_updater::Builder::new()
-                    .default_version_comparator(|current, release| {
-                        release.version > current
-                            || core::updater::is_build_to_stable(&current.to_string(), &release.version.to_string())
-                    })
-                    .build(),
-            )
             .plugin(tauri_plugin_clipboard_manager::init())
             .plugin(tauri_plugin_process::init())
             .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -60,14 +59,40 @@ mod app_init {
             .plugin(tauri_plugin_dialog::init())
             .plugin(tauri_plugin_shell::init())
             .plugin(tauri_plugin_opener::init())
-            .plugin(tauri_plugin_deep_link::init())
-            .plugin(tauri_plugin_http::init())
-            .plugin(
-                tauri_plugin_mihomo::Builder::new()
-                    .protocol(tauri_plugin_mihomo::models::Protocol::LocalSocket)
-                    .socket_path(crate::config::IClashTemp::guard_external_controller_ipc())
-                    .build(),
-            );
+            .plugin(tauri_plugin_http::init());
+
+        #[cfg(windows)]
+        {
+            if let Ok(controller) = core::portable::controller() {
+                builder = builder.plugin(
+                    tauri_plugin_mihomo::Builder::new()
+                        .protocol(tauri_plugin_mihomo::models::Protocol::Http)
+                        .external_host("127.0.0.1")
+                        .external_port(controller.port())
+                        .secret(&controller.secret)
+                        .build(),
+                );
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            builder = builder
+                .plugin(
+                    tauri_plugin_updater::Builder::new()
+                        .default_version_comparator(|current, release| {
+                            release.version > current
+                                || core::updater::is_build_to_stable(&current.to_string(), &release.version.to_string())
+                        })
+                        .build(),
+                )
+                .plugin(tauri_plugin_deep_link::init())
+                .plugin(
+                    tauri_plugin_mihomo::Builder::new()
+                        .protocol(tauri_plugin_mihomo::models::Protocol::LocalSocket)
+                        .socket_path(crate::config::IClashTemp::guard_external_controller_ipc())
+                        .build(),
+                );
+        }
 
         // Devtools plugin only in debug mode with feature tauri-dev
         // to avoid duplicated registering of logger since the devtools plugin also registers a logger
@@ -79,6 +104,7 @@ mod app_init {
     }
 
     /// Setup deep link handling
+    #[cfg(not(windows))]
     pub fn setup_deep_links(app: &tauri::App) {
         #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
         {
@@ -97,6 +123,7 @@ mod app_init {
     }
 
     /// Setup autostart plugin
+    #[cfg(not(windows))]
     pub fn setup_autostart(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         #[cfg(target_os = "macos")]
         let mut auto_start_plugin_builder = tauri_plugin_autostart::Builder::new();
@@ -114,6 +141,7 @@ mod app_init {
     }
 
     /// Setup window state management
+    #[cfg(not(windows))]
     pub fn setup_window_state(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         logging!(debug, Type::Setup, "初始化窗口状态管理...");
         let window_state_plugin = tauri_plugin_window_state::Builder::new()
@@ -127,7 +155,16 @@ mod app_init {
     pub fn generate_handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
         {
             let builder = crate::ipc::builder();
-            move |invoke| builder.invoke_handler()(invoke)
+            move |invoke| {
+                #[cfg(windows)]
+                if core::portable::unsupported_command(invoke.message.command()) {
+                    invoke
+                        .resolver
+                        .reject("This operation is unavailable in ChainDesk portable mode");
+                    return true;
+                }
+                builder.invoke_handler()(invoke)
+            }
         }
     }
 }
@@ -160,20 +197,40 @@ pub fn run() -> std::process::ExitCode {
         return std::process::ExitCode::SUCCESS;
     }
 
-    // Runs before the singleton check, which is the first thing to open a file in that directory.
     #[cfg(windows)]
-    if let Err(error) =
-        utils::dirs::preinit_app_data_dir().and_then(|root| core::owner_identity::repair_app_data_root_owner(&root))
-    {
-        // The logger is installed later in setup(), so this would otherwise be lost.
-        eprintln!("[clash-verge] 应用数据目录所有权修复失败: {error:#}");
-        logging!(error, Type::Setup, "应用数据目录所有权修复失败: {error:#}");
+    if let Err(error) = utils::portable::initialize() {
+        utils::startup::report_error(&error);
+        return std::process::ExitCode::FAILURE;
     }
+
+    let default_parallelism = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
+    let worker_limit = std::cmp::min(default_parallelism, 4);
+    let blocking_limit = 2 * worker_limit;
+
+    #[allow(clippy::unwrap_used)]
+    let tokio_runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(worker_limit)
+        .max_blocking_threads(blocking_limit)
+        .enable_all()
+        .thread_name_fn(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            format!("clash-verge-runtime-{id}")
+        })
+        .build()
+        .unwrap();
+    tauri::async_runtime::set(tokio_runtime.handle().clone());
 
     match handle_singleton_startup(app_init::init_singleton_check(), utils::startup::report_error) {
         StartupAction::Continue => {}
         StartupAction::ExitSuccess => return std::process::ExitCode::SUCCESS,
         StartupAction::ExitFailure => return std::process::ExitCode::FAILURE,
+    }
+
+    #[cfg(windows)]
+    if let Err(error) = core::portable::initialize() {
+        utils::startup::report_error(&error);
+        return std::process::ExitCode::FAILURE;
     }
 
     #[cfg(target_os = "linux")]
@@ -213,12 +270,15 @@ pub fn run() -> std::process::ExitCode {
                 }
 
                 logging!(debug, Type::Setup, "开始应用初始化...");
+                #[cfg(not(windows))]
                 if let Err(e) = app_init::setup_autostart(app) {
                     logging!(error, Type::Setup, "Failed to setup autostart: {}", e);
                 }
 
+                #[cfg(not(windows))]
                 app_init::setup_deep_links(app);
 
+                #[cfg(not(windows))]
                 if let Err(e) = app_init::setup_window_state(app) {
                     logging!(error, Type::Setup, "Failed to setup window state: {}", e);
                 }

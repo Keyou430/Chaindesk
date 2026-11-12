@@ -158,7 +158,7 @@ impl CoreManager {
     pub async fn use_default_config(&self, status: NoticeStatus, message: &str) -> Result<()> {
         use crate::constants::files::RUNTIME_CONFIG;
 
-        let runtime_path = dirs::app_home_dir()?.join(RUNTIME_CONFIG);
+        let runtime_path = dirs::runtime_dir()?.join(RUNTIME_CONFIG);
         let clash_config = &Config::clash().await.latest_arc().0;
 
         Config::runtime().await.edit_draft(|d| {

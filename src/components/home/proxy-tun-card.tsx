@@ -22,6 +22,7 @@ import { useSystemProxyState } from '@/hooks/use-system-proxy-state'
 import { useSystemState } from '@/hooks/use-system-state'
 import { useVerge } from '@/hooks/use-verge'
 import { showNotice } from '@/services/notice-service'
+import getSystem from '@/utils/get-system'
 
 const LOCAL_STORAGE_TAB_KEY = 'clash-verge-proxy-active-tab'
 
@@ -137,8 +138,10 @@ const TabDescription: FC<TabDescriptionProps> = memo(
 export const ProxyTunCard: FC = () => {
   const { t } = useTranslation()
   const theme = useTheme()
-  const [activeTab, setActiveTab] = useState<string>(
-    () => localStorage.getItem(LOCAL_STORAGE_TAB_KEY) || 'system',
+  const [activeTab, setActiveTab] = useState<string>(() =>
+    getSystem() === 'windows'
+      ? 'system'
+      : localStorage.getItem(LOCAL_STORAGE_TAB_KEY) || 'system',
   )
 
   const { verge } = useVerge()
@@ -196,13 +199,15 @@ export const ProxyTunCard: FC = () => {
           label={t('settings.sections.system.toggles.systemProxy')}
           hasIndicator={systemProxyIndicator}
         />
-        <TabButton
-          isActive={activeTab === 'tun'}
-          onClick={() => handleTabChange('tun')}
-          icon={TroubleshootRounded}
-          label={t('settings.sections.system.toggles.tunMode')}
-          hasIndicator={enable_tun_mode! && isTunModeAvailable}
-        />
+        {getSystem() !== 'windows' && (
+          <TabButton
+            isActive={activeTab === 'tun'}
+            onClick={() => handleTabChange('tun')}
+            icon={TroubleshootRounded}
+            label={t('settings.sections.system.toggles.tunMode')}
+            hasIndicator={enable_tun_mode! && isTunModeAvailable}
+          />
+        )}
       </Stack>
 
       <Box

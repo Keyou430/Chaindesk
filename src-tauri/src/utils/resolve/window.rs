@@ -81,7 +81,7 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
         "main", /* the unique window label */
         tauri::WebviewUrl::App(start_page.into()),
     )
-    .title("Clash Verge")
+    .title("ChainDesk")
     .center()
     .decorations(DEFAULT_DECORATIONS)
     .fullscreen(false)
@@ -104,6 +104,15 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
     }
 
     builder = builder.background_color(background_color);
+
+    #[cfg(windows)]
+    {
+        builder = builder.data_directory(
+            crate::utils::dirs::app_home_dir()
+                .map_err(|e| e.to_string())?
+                .join("webview"),
+        );
+    }
 
     match builder.build() {
         Ok(window) => {

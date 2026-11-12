@@ -343,7 +343,7 @@ fn try_lock_instance(file: &std::fs::File) -> Result<bool> {
     }
 }
 
-fn random_token() -> Result<String> {
+pub(crate) fn random_token() -> Result<String> {
     let mut bytes = [0u8; 32];
     getrandom::fill(&mut bytes)?;
     Ok(bytes.iter().map(|byte| format!("{byte:02x}")).collect())

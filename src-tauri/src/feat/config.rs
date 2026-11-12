@@ -38,6 +38,18 @@ pub(super) async fn apply_verge_patch_locked(
     patch: &IVerge,
     not_save_file: bool,
 ) -> Result<()> {
+    if cfg!(windows)
+        && (patch.enable_tun_mode == Some(true)
+            || patch.enable_auto_launch == Some(true)
+            || patch.enable_proxy_guard == Some(true)
+            || patch.auto_check_update == Some(true)
+            || patch.enable_external_controller == Some(true)
+            || patch.startup_script.as_ref().is_some_and(|script| !script.is_empty())
+            || patch.proxy_host.as_ref().is_some_and(|host| host != "127.0.0.1")
+            || patch.clash_core.as_ref().is_some_and(|core| core != "verge-mihomo"))
+    {
+        anyhow::bail!("This setting is unavailable in ChainDesk portable mode");
+    }
     super::executor::apply(
         _config_write,
         super::executor::Patch::Verge {

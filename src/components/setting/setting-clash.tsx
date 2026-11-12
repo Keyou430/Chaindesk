@@ -122,6 +122,17 @@ const SettingClash = ({ onError }: Props) => {
     if (!dnsUpdating) setDnsConfirmation(null)
   }
 
+  if (isWIN) {
+    return (
+      <SettingList title={t('settings.sections.clash.title')}>
+        <SettingItem label="Core">mihomo {version}</SettingItem>
+        <SettingItem label="Proxy listener">
+          127.0.0.1:{displayedMixedPort}
+        </SettingItem>
+      </SettingList>
+    )
+  }
+
   return (
     <SettingList title={t('settings.sections.clash.title')}>
       <WebUIViewer ref={webRef} />

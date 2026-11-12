@@ -7,12 +7,13 @@ use std::collections::HashMap;
 #[tauri::command]
 #[specta::specta]
 pub async fn get_runtime_config() -> CmdResult<Option<crate::ipc::YamlMapping>> {
-    Ok(Config::runtime()
-        .await
-        .latest_arc()
-        .config
-        .clone()
-        .map(crate::ipc::YamlMapping))
+    let mut config = Config::runtime().await.latest_arc().config.clone();
+    #[cfg(windows)]
+    if let Some(config) = config.as_mut() {
+        crate::core::portable::constrain_config(config).stringify_err()?;
+        crate::core::portable::redact_config(config);
+    }
+    Ok(config.map(crate::ipc::YamlMapping))
 }
 
 #[tauri::command]
@@ -21,10 +22,15 @@ pub async fn get_runtime_yaml() -> CmdResult<std::string::String> {
     let runtime = Config::runtime().await;
     let runtime = runtime.latest_arc();
 
-    let config = runtime.config.as_ref();
+    let mut config = runtime.config.clone();
+    #[cfg(windows)]
+    if let Some(config) = config.as_mut() {
+        crate::core::portable::constrain_config(config).stringify_err()?;
+        crate::core::portable::redact_config(config);
+    }
     config
         .ok_or_else(|| anyhow!("failed to parse config to yaml file"))
-        .and_then(|config| yaml_emitter::to_mihomo_config_string(config).context("failed to convert config to yaml"))
+        .and_then(|config| yaml_emitter::to_mihomo_config_string(&config).context("failed to convert config to yaml"))
         .stringify_err()
 }
 

@@ -18,7 +18,11 @@ pub async fn open_app_dir() -> CmdResult<()> {
 #[tauri::command]
 #[specta::specta]
 pub async fn open_core_dir() -> CmdResult<()> {
+    #[cfg(target_os = "windows")]
+    let core_dir = crate::utils::portable::paths().stringify_err()?.root.join("core");
+    #[cfg(not(target_os = "windows"))]
     let core_dir = tauri::utils::platform::current_exe().stringify_err()?;
+    #[cfg(not(target_os = "windows"))]
     let core_dir = core_dir.parent().ok_or("failed to get core dir")?;
     open::that(core_dir).stringify_err()
 }

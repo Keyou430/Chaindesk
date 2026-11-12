@@ -1,11 +1,9 @@
 import { DragDropProvider, KeyboardSensor, PointerSensor } from '@dnd-kit/react'
-import { Box, List, Menu, MenuItem, SvgIcon } from '@mui/material'
+import { Box, List, Menu, MenuItem, SvgIcon, Typography } from '@mui/material'
 import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import iconDark from '@/assets/image/icon_dark.svg?react'
-import iconLight from '@/assets/image/icon_light.svg?react'
-import LogoSvg from '@/assets/image/logo.svg?react'
+import ChainDeskIcon from '@/assets/image/chaindesk.svg?react'
 import { useVerge } from '@/hooks/use-verge'
 import { useNavMenuOrder } from '@/pages/_layout/hooks'
 import { navItems } from '@/pages/_navigation'
@@ -14,7 +12,6 @@ import { SortableItem } from '../base'
 
 import { LayoutItem } from './layout-item'
 import { LayoutTraffic } from './layout-traffic'
-import { UpdateButton } from './update-button'
 
 type MenuContextPosition = { top: number; left: number }
 
@@ -26,7 +23,7 @@ interface LayoutSidebarProps {
 const SENSORS = [PointerSensor, KeyboardSensor]
 
 export const LayoutSidebar = (props: LayoutSidebarProps) => {
-  const { isDark, isCollapsed } = props
+  const { isCollapsed } = props
   const { t } = useTranslation()
   const { verge, mutateVerge, patchVerge } = useVerge()
   const [menuUnlocked, setMenuUnlocked] = useState(false)
@@ -134,7 +131,7 @@ export const LayoutSidebar = (props: LayoutSidebarProps) => {
           }}
         >
           <SvgIcon
-            component={isDark ? iconDark : iconLight}
+            component={ChainDeskIcon}
             style={{
               height: '36px',
               width: '36px',
@@ -144,9 +141,10 @@ export const LayoutSidebar = (props: LayoutSidebarProps) => {
             }}
             inheritViewBox
           />
-          <LogoSvg fill={isDark ? 'white' : 'black'} />
+          <Typography component="span" sx={{ fontSize: 22, fontWeight: 700 }}>
+            ChainDesk
+          </Typography>
         </div>
-        <UpdateButton className="the-newbtn" />
       </div>
 
       {/* Edit navigation menu badge */}

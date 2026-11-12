@@ -3,8 +3,11 @@
   "version": "2.5.9",
   "license": "GPL-3.0-only",
   "scripts": {
+    "chain:build-portable": "pwsh -NoProfile -File scripts/chaindesk/build-baseline.ps1 -PinnedMsvc -Portable",
+    "chain:assemble-portable": "node scripts/chaindesk/assemble-portable.mjs",
     "chain:verify-vs": "pwsh -NoProfile -File scripts/chaindesk/verify-vs-catalog.ps1",
     "chain:accept-vm": "node scripts/chaindesk/run-clean-vm.mjs",
+    "chain:accept-portable-vm": "node scripts/chaindesk/run-clean-vm.mjs --milestone m1",
     "chain:archive-core-inputs": "node scripts/chaindesk/archive-core-inputs.mjs",
     "chain:seal-m0": "node scripts/chaindesk/seal-m0.mjs",
     "chain:verify": "node scripts/chaindesk/verify-baseline.mjs",

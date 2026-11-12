@@ -7,7 +7,11 @@ use crate::core::{
 #[tauri::command]
 #[specta::specta]
 pub async fn get_runtime_state() -> Result<RunStateView, String> {
-    Ok(RUN_STATE.settled().await.to_view())
+    let mut view = RUN_STATE.settled().await.to_view();
+    if cfg!(windows) {
+        view.tun_capable = false;
+    }
+    Ok(view)
 }
 
 #[tauri::command]

@@ -1,3 +1,14 @@
+## ChainDesk M1 (development)
+
+<details>
+<summary><strong> ✨ 新增功能 </strong></summary>
+
+**🖥️ Windows**
+
+- Windows：新增 ChainDesk 便携骨架，独立保存数据并提示与其他客户端的代理冲突
+
+</details>
+
 ## v2.5.9
 
 - **Mihomo(Meta) 内核升级至 v1.19.33**

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "baselineVersion": 3,
-  "confirmedOn": "2026-11-10",
+  "baselineVersion": 4,
+  "confirmedOn": "2026-11-12",
   "timezone": "Asia/Shanghai",
   "purpose": "implementationBaselineNotReleaseAcceptance",
   "source": {
@@ -498,7 +498,10 @@
   "platform": {
     "architecture": "x64",
     "minimumWindows11Build": 26200,
-    "releaseTargetVersions": ["25H2", "26H2"],
+    "releaseTargetVersions": [
+      "25H2",
+      "26H2"
+    ],
     "windows10CompatibilityCandidate": {
       "version": "22H2",
       "build": 19045,
@@ -518,7 +521,10 @@
     "runtimeDirectory": "data/runtime/<sessionId>",
     "savePlaintextCredentialsInBackups": false,
     "runtimeConfig": "restrictedTemporaryYamlFile",
-    "sensitiveFileAclAllow": ["currentUserSid", "SYSTEM"]
+    "sensitiveFileAclAllow": [
+      "currentUserSid",
+      "SYSTEM"
+    ]
   },
   "control": {
     "coreTransport": "loopbackTcp",
@@ -528,7 +534,10 @@
     "portAllocationAttempts": 5,
     "mihomoNativePipeEnabled": false,
     "watchdogTransport": "namedPipe",
-    "watchdogAclAllow": ["currentUserSid", "SYSTEM"],
+    "watchdogAclAllow": [
+      "currentUserSid",
+      "SYSTEM"
+    ],
     "rejectRemotePipeClients": true,
     "maximumIpcMessageBytes": 65536,
     "coreEnvironmentPolicy": "allowlistNecessaryWindowsVariablesExcludeClashOverridesAndInheritedProxies"
@@ -537,8 +546,14 @@
     "enable": true,
     "enhancedMode": "redir-host",
     "ipv6": false,
-    "bootstrapNameservers": ["223.5.5.5", "119.29.29.29"],
-    "proxyServerNameservers": ["223.5.5.5", "119.29.29.29"],
+    "bootstrapNameservers": [
+      "223.5.5.5",
+      "119.29.29.29"
+    ],
+    "proxyServerNameservers": [
+      "223.5.5.5",
+      "119.29.29.29"
+    ],
     "directNameserver": "https://dns.alidns.com/dns-query#DIRECT",
     "proxiedNameserver": "https://1.1.1.1/dns-query#<exitGroup>",
     "cnPolicyOnlyInDomesticDirectPreset": true,
@@ -549,7 +564,10 @@
   "limits": {
     "subscriptionTimeoutSeconds": 20,
     "subscriptionMaxRetries": 2,
-    "subscriptionRetryBackoffSeconds": [1, 2],
+    "subscriptionRetryBackoffSeconds": [
+      1,
+      2
+    ],
     "subscriptionMaxDecodedBytes": 10485760,
     "subscriptionMaxHttpsRedirects": 3,
     "yamlMaxDepth": 32,
@@ -603,7 +621,7 @@
     "nativeBuild": "passedPinnedMsvcComponentBuildWithExistingSdk",
     "configurationTest": "passedOwnedLoopbackFixtures",
     "realChainTest": "loopbackFixturePassedRemoteProviderMatrixNotRun",
-    "cleanVmAcceptance": "passedStandardUserSidecarFixedWebview",
+    "cleanVmAcceptance": "passedStandardUserPortableCoexistenceFixedWebview",
     "systemProxyModified": false,
     "coreExecuted": true,
     "toolchainInstalled": true,
@@ -620,7 +638,16 @@
       "testsFailed": 0,
       "scope": "loopbackSsFrontAndAuthenticatedSocks5Exit"
     },
-    "coreExecutionScope": "ownedLoopbackSmokeFixturesOnly"
+    "coreExecutionScope": "ownedLoopbackAndDisposableGuestFixtures",
+    "systemProxyModificationScope": "guestFixturesOnlyHostUnchanged",
+    "guestSystemProxyModifiedForAcceptance": true,
+    "frontendLint": "passedFullSource",
+    "rustReadinessTests": {
+      "testsPassed": 6,
+      "testsFailed": 0
+    },
+    "rustClippy": "allTargetsAllFeaturesPassedWithDeadCodeOnlyExemption",
+    "retainedLegacyDeadCodeWarnings": 13
   },
   "releaseGates": [
     {
@@ -644,11 +671,13 @@
     },
     {
       "id": "portableCoexistenceAndRecovery",
-      "status": "notRun"
+      "status": "m1CoexistencePassedPersistentRecoveryPending",
+      "reason": "M1 standard-user VM passed original-client coexistence, injected port races, proxy/PAC ownership and exact normal-exit restoration; persistent crash recovery and watchdog remain M3."
     },
     {
       "id": "finalZipCleanVmAcceptance",
-      "status": "notRun"
+      "status": "m1DevelopmentFullZipPassedFinalReleaseMatrixPending",
+      "reason": "The exact M1 development full ZIP passed 61 checks on a disposable Windows guest. Final signed standard/full release packages and the supported environment matrix remain M4."
     },
     {
       "id": "publisherSigningAssets",
@@ -672,14 +701,19 @@
     }
   },
   "implementation": {
-    "milestone": "M0",
-    "status": "m0AcceptancePassed",
+    "milestone": "M1",
+    "status": "portableSkeletonAcceptancePassed",
     "sourceBranch": "chaindesk/main",
-    "reuseAudit": "链式代理便携客户端-M0实施记录.md",
+    "reuseAudit": "链式代理便携客户端-M1实施与验收.md",
     "logsDirectory": ".chaindesk/logs",
-    "applicationBusinessSourceModified": false,
-    "upstreamBuildAndUpdateCommandsModified": false,
-    "portableClientDelivered": false
+    "applicationBusinessSourceModified": true,
+    "upstreamBuildAndUpdateCommandsModified": true,
+    "portableClientDelivered": true,
+    "deliveryScope": "M1DevelopmentSkeletonNotFinalRelease",
+    "localTrackingApproval": "approvedInChatOn2026-11-11",
+    "m0Commit": "fc1f269bb3e5df1460207530d2c89b2d2a623485",
+    "m0Tag": "chaindesk-m0-20261111",
+    "milestoneTag": "chaindesk-m1-20261112"
   },
   "cleanVmEnvironment": {
     "purpose": "M0ApplicationFeasibilityOnly",
@@ -730,5 +764,25 @@
     "acceptedWindowsBuild": "26300.9457",
     "acceptedApplicationSha256": "dea614487f913b59663aed464f4e144fce9188d1dcf79fc1d0099891d427ceaa",
     "acceptedHarnessSha256": "6803521e5bc78317591d1b5731b20dbdc94d87cb0fc84f38e4f16d8edc81ff34"
+  },
+  "portableVmAcceptance": {
+    "status": "passed",
+    "acceptedAt": "2026-11-12T00:15:31.1242786Z",
+    "checksPassed": 61,
+    "windowsBuild": "26300.9457",
+    "standardUser": true,
+    "guestPoweredOff": true,
+    "acceptedApplicationSha256": "d5d1cd90abaaee619cafc9067ed30b80f123833e25b18c41c14d57014ba1dd0e",
+    "acceptedArchiveSha256": "22c95a2492564dba6ab3f298978460793a13ca461c51125c22d97dc3c996086a",
+    "acceptedSourceFingerprint": "f5b446050ab05fd10b5580370b9a791068d53babe545cb8d1e741780b5269b5a",
+    "acceptedHarnessSha256": "27cc1767699886f4f143894236b4f4d7735fdb451b5c3dfd7526b10c57434fcf",
+    "acceptedScreenshotSha256": "fc3009eddd723f04d25d46e05ee8f7a63d7863ac0dbf24b2a09bbe4a413c4cbd",
+    "originalClientScope": "sealedM0UpstreamExecutableWithOwnedFixture",
+    "originalAutomaticUpdateAndHotkeysDisabled": true,
+    "originalPort": 7897,
+    "injectedRacePort": 7900,
+    "recoveredPort": 7901,
+    "hostProxySnapshotMatches": true,
+    "finalProductReleaseReady": false
   }
 }

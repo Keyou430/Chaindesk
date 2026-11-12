@@ -97,7 +97,7 @@ const SettingVergeBasic = ({ onError }: Props) => {
       <HotkeyViewer ref={hotkeyRef} />
       <MiscViewer ref={miscRef} />
       <LayoutViewer ref={layoutRef} />
-      <UpdateViewer ref={updateRef} />
+      {OS !== 'windows' && <UpdateViewer ref={updateRef} />}
       <BackupViewer ref={backupRef} />
 
       <SettingItem label={t('settings.components.verge.basic.fields.language')}>
@@ -210,58 +210,60 @@ const SettingVergeBasic = ({ onError }: Props) => {
         </GuardState>
       </SettingItem>
 
-      <SettingItem
-        label={t('settings.components.verge.basic.fields.startupScript')}
-      >
-        <GuardState
-          value={startup_script ?? ''}
-          onCatch={onError}
-          onFormat={(e: any) => e.target.value}
-          onChange={(e) => onChangeData({ startup_script: e })}
-          onGuard={(e) => patchVerge({ startup_script: e })}
+      {OS !== 'windows' && (
+        <SettingItem
+          label={t('settings.components.verge.basic.fields.startupScript')}
         >
-          <Input
-            value={startup_script}
-            disabled
-            disableUnderline
-            sx={{ width: 230 }}
-            endAdornment={
-              <>
-                <Button
-                  onClick={async () => {
-                    const selected = await open({
-                      directory: false,
-                      multiple: false,
-                      filters: [
-                        {
-                          name: 'Shell Script',
-                          extensions: ['sh', 'bat', 'ps1'],
-                        },
-                      ],
-                    })
-                    if (selected) {
-                      onChangeData({ startup_script: `${selected}` })
-                      patchVerge({ startup_script: `${selected}` })
-                    }
-                  }}
-                >
-                  {t('settings.components.verge.basic.actions.browse')}
-                </Button>
-                {startup_script && (
+          <GuardState
+            value={startup_script ?? ''}
+            onCatch={onError}
+            onFormat={(e: any) => e.target.value}
+            onChange={(e) => onChangeData({ startup_script: e })}
+            onGuard={(e) => patchVerge({ startup_script: e })}
+          >
+            <Input
+              value={startup_script}
+              disabled
+              disableUnderline
+              sx={{ width: 230 }}
+              endAdornment={
+                <>
                   <Button
                     onClick={async () => {
-                      onChangeData({ startup_script: '' })
-                      patchVerge({ startup_script: '' })
+                      const selected = await open({
+                        directory: false,
+                        multiple: false,
+                        filters: [
+                          {
+                            name: 'Shell Script',
+                            extensions: ['sh', 'bat', 'ps1'],
+                          },
+                        ],
+                      })
+                      if (selected) {
+                        onChangeData({ startup_script: `${selected}` })
+                        patchVerge({ startup_script: `${selected}` })
+                      }
                     }}
                   >
-                    {t('shared.actions.clear')}
+                    {t('settings.components.verge.basic.actions.browse')}
                   </Button>
-                )}
-              </>
-            }
-          ></Input>
-        </GuardState>
-      </SettingItem>
+                  {startup_script && (
+                    <Button
+                      onClick={async () => {
+                        onChangeData({ startup_script: '' })
+                        patchVerge({ startup_script: '' })
+                      }}
+                    >
+                      {t('shared.actions.clear')}
+                    </Button>
+                  )}
+                </>
+              }
+            ></Input>
+          </GuardState>
+        </SettingItem>
+      )}
 
       <SettingItem
         onClick={() => themeRef.current?.open()}

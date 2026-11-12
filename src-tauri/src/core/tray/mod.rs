@@ -94,6 +94,12 @@ impl TrayState {
 
     #[allow(clippy::missing_const_for_fn)]
     fn default_icon(verge: &IVerge, kind: IconKind) -> (bool, Cow<'_, [u8]>) {
+        if cfg!(windows) {
+            return (
+                false,
+                Cow::Borrowed(include_bytes!("../../../icons/chaindesk/icon.ico")),
+            );
+        }
         #[cfg(target_os = "macos")]
         {
             let is_mono = verge.tray_icon.as_deref().unwrap_or("monochrome") == "monochrome";
@@ -315,7 +321,7 @@ impl Tray {
         );
 
         let tooltip = format!(
-            "Clash Verge {}\n{}: {}\n{}: {}\n{}: {}",
+            "ChainDesk {}\n{}: {}\n{}: {}\n{}: {}",
             reassembled_version,
             sys_proxy_text,
             switch_str(system_proxy),
@@ -852,10 +858,11 @@ async fn create_tray_menu(
         _ => {}
     }
 
+    menu_items.extend_from_slice(&[separator, system_proxy as &dyn IsMenuItem<Wry>]);
+    if !cfg!(windows) {
+        menu_items.push(tun_mode as &dyn IsMenuItem<Wry>);
+    }
     menu_items.extend_from_slice(&[
-        separator,
-        system_proxy as &dyn IsMenuItem<Wry>,
-        tun_mode as &dyn IsMenuItem<Wry>,
         separator,
         lightweight_mode as &dyn IsMenuItem<Wry>,
         open_dir as &dyn IsMenuItem<Wry>,

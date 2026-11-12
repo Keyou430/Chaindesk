@@ -67,6 +67,11 @@ pub(crate) fn open_or_create_current_user_lock(path: &Path) -> Result<std::fs::F
     windows_owner::open_or_create_lock_file(path)
 }
 
+#[cfg(windows)]
+pub(crate) fn create_private_current_user_directory(path: &Path) -> Result<()> {
+    windows_owner::create_private_directory(path)
+}
+
 /// Repairs an application data root Windows no longer reports as owned by the current user.
 ///
 /// The Service authenticates by comparing this directory's owner SID against the caller's, so a
@@ -79,7 +84,7 @@ pub(crate) fn repair_app_data_root_owner(app_data_root: &Path) -> Result<()> {
 #[cfg(windows)]
 pub(crate) fn current_user_pipe_sddl() -> Result<String> {
     let sid = windows_owner::current_sid()?;
-    Ok(format!("D:P(A;;GA;;;{sid})(A;;GA;;;SY)(A;;GA;;;BA)"))
+    Ok(format!("D:P(A;;GA;;;{sid})(A;;GA;;;SY)"))
 }
 
 #[cfg(windows)]
@@ -93,8 +98,8 @@ mod windows_owner {
     use std::os::windows::io::{AsRawHandle as _, FromRawHandle as _};
     use std::path::Path;
     use windows_sys::Win32::Foundation::{
-        CloseHandle, ERROR_ACCESS_DENIED, ERROR_FILE_EXISTS, ERROR_FILE_NOT_FOUND, ERROR_PATH_NOT_FOUND, GENERIC_READ,
-        GENERIC_WRITE, GetLastError, INVALID_HANDLE_VALUE, LocalFree,
+        CloseHandle, ERROR_ACCESS_DENIED, ERROR_ALREADY_EXISTS, ERROR_FILE_EXISTS, ERROR_FILE_NOT_FOUND,
+        ERROR_PATH_NOT_FOUND, GENERIC_READ, GENERIC_WRITE, GetLastError, INVALID_HANDLE_VALUE, LocalFree,
     };
     use windows_sys::Win32::Security::Authorization::{
         ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, GetSecurityInfo, SDDL_REVISION_1,
@@ -104,13 +109,14 @@ mod windows_owner {
         ACCESS_ALLOWED_ACE, ACL, DACL_SECURITY_INFORMATION, EqualSid, GetAce, GetSecurityDescriptorControl,
         GetSecurityDescriptorDacl, GetSecurityDescriptorOwner, GetTokenInformation, IsValidSid, IsWellKnownSid,
         OWNER_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR, PSID, SE_DACL_PROTECTED,
-        SECURITY_ATTRIBUTES, TOKEN_QUERY, TOKEN_USER, TokenUser, WinBuiltinAdministratorsSid, WinLocalSystemSid,
+        SECURITY_ATTRIBUTES, TOKEN_QUERY, TOKEN_USER, TokenUser, WinLocalSystemSid,
     };
     use windows_sys::Win32::Storage::FileSystem::{
-        BY_HANDLE_FILE_INFORMATION, CREATE_NEW, CreateFileW, FILE_ALL_ACCESS, FILE_ATTRIBUTE_DIRECTORY,
-        FILE_ATTRIBUTE_HIDDEN, FILE_ATTRIBUTE_NORMAL, FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_BACKUP_SEMANTICS,
-        FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_TYPE_DISK,
-        GetFileInformationByHandle, GetFileType, OPEN_ALWAYS, OPEN_EXISTING, READ_CONTROL, WRITE_DAC, WRITE_OWNER,
+        BY_HANDLE_FILE_INFORMATION, CREATE_NEW, CreateDirectoryW, CreateFileW, FILE_ALL_ACCESS,
+        FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_HIDDEN, FILE_ATTRIBUTE_NORMAL, FILE_ATTRIBUTE_REPARSE_POINT,
+        FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE,
+        FILE_TYPE_DISK, GetFileInformationByHandle, GetFileType, OPEN_ALWAYS, OPEN_EXISTING, READ_CONTROL, WRITE_DAC,
+        WRITE_OWNER,
     };
     use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 
@@ -205,6 +211,27 @@ mod windows_owner {
         let sid = current_sid()?;
         let descriptor = LocalSecurityDescriptor::from_sid(&sid)?;
         create_file(path, &descriptor)
+    }
+
+    pub(super) fn create_private_directory(path: &Path) -> Result<()> {
+        let sid = current_sid()?;
+        let descriptor = LocalSecurityDescriptor::from_sid_with_inheritance(&sid, true)?;
+        let attributes = SECURITY_ATTRIBUTES {
+            nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
+            lpSecurityDescriptor: descriptor.0,
+            bInheritHandle: 0,
+        };
+        let wide = wide_path(path)?;
+        if unsafe { CreateDirectoryW(wide.as_ptr(), &attributes) } == 0
+            && unsafe { GetLastError() } != ERROR_ALREADY_EXISTS
+        {
+            return Err(std::io::Error::last_os_error()).context("failed to create private data directory");
+        }
+        let directory = open_no_reparse(path, true, READ_CONTROL | WRITE_DAC)?;
+        if !owner_matches(&directory, descriptor.owner()?)? {
+            bail!("portable data directory belongs to another user; choose a new writable directory");
+        }
+        descriptor.apply_dacl(directory.as_raw_handle())
     }
 
     pub(super) fn open_private_file(path: &Path) -> Result<std::fs::File> {
@@ -349,7 +376,6 @@ mod windows_owner {
 
         let mut owner_ace = false;
         let mut system_ace = false;
-        let mut administrators_ace = false;
         for index in 0..unsafe { (*dacl).AceCount } as u32 {
             let mut ace = std::ptr::null_mut();
             if unsafe { GetAce(dacl, index, &mut ace) } == 0 || ace.is_null() {
@@ -367,13 +393,11 @@ mod windows_owner {
                 owner_ace = true;
             } else if unsafe { IsWellKnownSid(ace_sid, WinLocalSystemSid) } != 0 {
                 system_ace = true;
-            } else if unsafe { IsWellKnownSid(ace_sid, WinBuiltinAdministratorsSid) } != 0 {
-                administrators_ace = true;
             } else {
                 bail!("current-user file DACL grants access to another SID");
             }
         }
-        if unsafe { (*dacl).AceCount } != 3 || !owner_ace || !system_ace || !administrators_ace {
+        if unsafe { (*dacl).AceCount } != 2 || !owner_ace || !system_ace {
             bail!("current-user file DACL is missing a required principal");
         }
         Ok(())
@@ -690,7 +714,12 @@ mod windows_owner {
 
     impl LocalSecurityDescriptor {
         fn from_sid(sid: &str) -> Result<Self> {
-            let sddl = format!("O:{sid}D:P(A;;FA;;;{sid})(A;;FA;;;SY)(A;;FA;;;BA)");
+            Self::from_sid_with_inheritance(sid, false)
+        }
+
+        fn from_sid_with_inheritance(sid: &str, directory: bool) -> Result<Self> {
+            let flags = if directory { "OICI" } else { "" };
+            let sddl = format!("O:{sid}D:P(A;{flags};FA;;;{sid})(A;{flags};FA;;;SY)");
             let mut wide: Vec<u16> = sddl.encode_utf16().collect();
             wide.push(0);
             let mut descriptor = std::ptr::null_mut();

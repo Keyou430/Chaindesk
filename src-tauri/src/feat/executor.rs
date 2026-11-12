@@ -152,7 +152,7 @@ pub(super) async fn apply(config_write: &MutexGuard<'_, ()>, patch: Patch<'_>, e
         if !Arc::ptr_eq(&original_runtime, &runtime.data_arc()) {
             announce(Refresh::Clash);
             // The Core already loaded this runtime; restoring its file would only hide that state.
-            let runtime_path = crate::utils::dirs::app_home_dir()?.join(crate::constants::files::RUNTIME_CONFIG);
+            let runtime_path = crate::utils::dirs::runtime_dir()?.join(crate::constants::files::RUNTIME_CONFIG);
             snapshots.retain(|snapshot| snapshot.path != runtime_path);
         }
         return match restore_files(&snapshots).await {

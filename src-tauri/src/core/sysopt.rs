@@ -324,6 +324,9 @@ impl Sysopt {
 
     /// Reconcile guard state with configuration and report success.
     pub(super) async fn refresh_guard(&self) -> bool {
+        if cfg!(windows) {
+            return true;
+        }
         logging!(info, Type::Core, "Refreshing system proxy guard...");
         let verge = Config::verge().await.latest_arc();
         let _operation = self.guard_operation_lock.lock().await;
@@ -464,6 +467,11 @@ impl Sysopt {
             (sys.clone(), auto.clone(), guard_type)
         };
 
+        #[cfg(windows)]
+        if cfg!(windows) {
+            return crate::core::portable_proxy::apply(sys, auto).await;
+        }
+
         let _guard_operation = self.guard_operation_lock.lock().await;
 
         // Drain the guard before any OS read or write.
@@ -529,6 +537,11 @@ impl Sysopt {
 
     /// reset the sysproxy
     pub(super) async fn reset_sysproxy(&self) -> Result<()> {
+        #[cfg(windows)]
+        if cfg!(windows) {
+            let _lock = self.update_lock.lock().await;
+            return crate::core::portable_proxy::restore().await;
+        }
         if self
             .reset_sysproxy
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)

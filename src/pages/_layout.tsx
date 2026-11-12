@@ -108,8 +108,8 @@ const Layout = () => {
     <ThemeProvider theme={theme}>
       {/* 左侧底部窗口控制按钮 */}
       <NoticeManager position={verge?.notice_position} />
-      <ServiceMigrationDialog />
-      <SysproxyPrivilegeDialog />
+      {OS !== 'windows' && <ServiceMigrationDialog />}
+      {OS !== 'windows' && <SysproxyPrivilegeDialog />}
       <div
         style={{
           animation: 'fadeIn 0.5s',

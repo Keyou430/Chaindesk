@@ -868,6 +868,9 @@ impl CoreManager {
 
     #[cfg(target_os = "windows")]
     async fn spawn_service_handoff_watcher(&self) {
+        if cfg!(windows) {
+            return;
+        }
         use crate::constants::timing;
         use crate::process::AsyncHandler;
         use std::sync::atomic::Ordering;

@@ -19,6 +19,7 @@ import { useSystemState } from '@/hooks/use-system-state'
 import { useVerge } from '@/hooks/use-verge'
 import { showNotice } from '@/services/notice-service'
 import { requestService } from '@/services/service-request'
+import getSystem from '@/utils/get-system'
 
 interface ProxySwitchProps {
   label?: string
@@ -193,7 +194,7 @@ const ProxyControlSwitches = ({
         />
       )}
 
-      {isTunMode && (
+      {isTunMode && getSystem() !== 'windows' && (
         <SwitchRow
           label={t('settings.sections.proxyControl.fields.tunMode')}
           active={(enable_tun_mode && isTunModeAvailable) || false}
@@ -230,7 +231,7 @@ const ProxyControlSwitches = ({
       )}
 
       <SysproxyViewer ref={sysproxyRef} />
-      <TunViewer ref={tunRef} />
+      {getSystem() !== 'windows' && <TunViewer ref={tunRef} />}
     </Box>
   )
 }

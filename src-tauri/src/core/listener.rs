@@ -602,6 +602,19 @@ fn windows_wildcard_tcp_listener_exists(address: IpAddr, port: u16) -> io::Resul
 }
 
 #[cfg(windows)]
+pub(crate) fn loopback_tcp_listener_owner(port: u16) -> io::Result<Option<u32>> {
+    use windows_sys::Win32::{NetworkManagement::IpHelper::MIB_TCPROW_OWNER_PID, Networking::WinSock::AF_INET};
+    let table = windows_tcp_listener_table(u32::from(AF_INET))?;
+    Ok(windows_tcp_listener_rows::<MIB_TCPROW_OWNER_PID>(&table)?
+        .iter()
+        .find(|row| {
+            row.dwLocalAddr == u32::from_ne_bytes(Ipv4Addr::LOCALHOST.octets())
+                && windows_tcp_port(row.dwLocalPort) == port
+        })
+        .map(|row| row.dwOwningPid))
+}
+
+#[cfg(windows)]
 fn windows_tcp_listener_table(family: u32) -> io::Result<Vec<u32>> {
     use std::{mem::size_of, ptr::null_mut};
     use windows_sys::Win32::{

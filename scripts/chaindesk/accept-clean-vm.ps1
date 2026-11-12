@@ -18,29 +18,7 @@ $application = $null
 $socket = $null
 $requestId = 0
 
-function Invoke-DebuggerExpression([string]$Expression) {
-    $script:requestId++
-    $request = @{ id = $script:requestId; method = 'Runtime.evaluate'; params = @{ expression = $Expression; awaitPromise = $true; returnByValue = $true } }
-    $bytes = [Text.Encoding]::UTF8.GetBytes(($request | ConvertTo-Json -Depth 8 -Compress))
-    $timeout = [Threading.CancellationTokenSource]::new(15000)
-    try {
-        [void]$socket.SendAsync([ArraySegment[byte]]::new($bytes), [Net.WebSockets.WebSocketMessageType]::Text, $true, $timeout.Token).GetAwaiter().GetResult()
-        do {
-            $message = [IO.MemoryStream]::new()
-            try {
-                do {
-                    $buffer = [byte[]]::new(65536)
-                    $received = $socket.ReceiveAsync([ArraySegment[byte]]::new($buffer), $timeout.Token).GetAwaiter().GetResult()
-                    if ($received.MessageType -eq [Net.WebSockets.WebSocketMessageType]::Close) { throw 'WebView debugger closed unexpectedly' }
-                    $message.Write($buffer, 0, $received.Count)
-                } until ($received.EndOfMessage)
-                $response = [Text.Encoding]::UTF8.GetString($message.ToArray()) | ConvertFrom-Json
-            } finally { $message.Dispose() }
-        } until ($response.id -eq $script:requestId)
-        if ($response.error -or $response.result.exceptionDetails) { throw ($response | ConvertTo-Json -Depth 6 -Compress) }
-        return $response.result.result.value
-    } finally { $timeout.Dispose() }
-}
+. (Join-Path $PSScriptRoot 'vm-debugger.ps1')
 
 try {
     $identity = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
@@ -164,5 +142,6 @@ try {
     $json = $result | ConvertTo-Json -Depth 10
     [IO.File]::WriteAllText('C:\M0\result.json', $json, [Text.UTF8Encoding]::new($false))
     Invoke-WebRequest -UseBasicParsing -Method Post -Uri "$Controller/result" -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($json)) -TimeoutSec 30 | Out-Null
+    if ($result.passed) { & shutdown.exe /s /t 0 }
 }
 if (-not $result.passed) { exit 1 }

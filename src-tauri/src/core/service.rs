@@ -798,6 +798,9 @@ pub fn stage_approved_core(core_path: &Path) -> Result<()> {
 
 /// Dispatches a privileged platform operation on a blocking thread.
 pub(crate) fn run_privileged_service_action(action: PendingAction) -> Result<()> {
+    if cfg!(windows) {
+        anyhow::bail!("Proxy services are unavailable in ChainDesk portable mode");
+    }
     let (operation, label): (fn() -> Result<()>, &'static str) = match action {
         PendingAction::Install => (install_service, "install service"),
         PendingAction::Uninstall => (uninstall_service, "uninstall service"),
@@ -1887,7 +1890,7 @@ impl ServiceManager {
     }
 
     pub async fn detect_startup_status(&self) {
-        if cfg!(feature = "dev-sidecar") {
+        if cfg!(windows) || cfg!(feature = "dev-sidecar") {
             RUN_STATE.accept_sidecar();
             return;
         }

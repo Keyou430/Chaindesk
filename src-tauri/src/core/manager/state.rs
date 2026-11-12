@@ -15,6 +15,7 @@ use log::Level;
 use std::num::NonZeroUsize;
 use std::path::Path;
 use tauri_plugin_mihomo::MihomoExt as _;
+#[cfg(not(windows))]
 use tauri_plugin_shell::ShellExt as _;
 
 pub(super) fn explain_core_occupancy(error: anyhow::Error) -> anyhow::Error {
@@ -115,6 +116,10 @@ where
         let future = probe();
         async move {
             future.await.map_err(|error| {
+                #[cfg(windows)]
+                if error.is::<crate::core::portable::PortConflict>() {
+                    return RetryError::Stop(error);
+                }
                 logging!(
                     debug,
                     Type::Core,
@@ -160,17 +165,60 @@ impl CoreManager {
 
     #[tracing::instrument(skip_all, level = "info", fields(pid = tracing::field::Empty))]
     pub(super) async fn start_core_by_sidecar(&self) -> Result<()> {
+        #[cfg(windows)]
+        if cfg!(windows) {
+            return retry(
+                RetryPolicy::fixed(
+                    NonZeroUsize::new(5).unwrap_or(NonZeroUsize::MIN),
+                    std::time::Duration::from_millis(200),
+                ),
+                |attempt| async move {
+                    if attempt > 0 {
+                        crate::core::portable::controller()
+                            .and_then(|controller| controller.renew_port())
+                            .map_err(RetryError::Stop)?;
+                        Config::resolve_sidecar_port_race().await.map_err(RetryError::Stop)?;
+                    }
+                    self.start_core_by_sidecar_once().await.map_err(|error| {
+                        if error.is::<crate::core::portable::PortConflict>() {
+                            RetryError::Retry(error)
+                        } else {
+                            RetryError::Stop(error)
+                        }
+                    })
+                },
+            )
+            .await;
+        }
+        self.start_core_by_sidecar_once().await
+    }
+
+    async fn start_core_by_sidecar_once(&self) -> Result<()> {
         self.wait_for_sidecar_exit().await?;
+        #[cfg(not(windows))]
         let execution = clash_verge_service_ipc::execution::reserve_sidecar()
             .await
             .inspect_err(service::record_residual_service)
             .map_err(explain_core_occupancy)?;
         self.core_stopped();
 
-        let sidecar_ipc = dirs::sidecar_ipc_path()?;
-        handle::Handle::app_handle()
-            .mihomo()
-            .update_socket_path(dirs::path_to_str(&sidecar_ipc)?.to_owned())?;
+        #[cfg(not(windows))]
+        let sidecar_ipc = {
+            let path = dirs::sidecar_ipc_path()?;
+            handle::Handle::app_handle()
+                .mihomo()
+                .update_socket_path(dirs::path_to_str(&path)?.to_owned())?;
+            path
+        };
+        #[cfg(windows)]
+        {
+            let controller = crate::core::portable::controller()?;
+            let mihomo = handle::Handle::mihomo();
+            mihomo.update_protocol(tauri_plugin_mihomo::models::Protocol::Http)?;
+            mihomo.update_external_host(Some("127.0.0.1"));
+            mihomo.update_external_port(Some(controller.port()));
+            mihomo.update_secret(Some(&controller.secret));
+        }
         #[cfg(target_os = "windows")]
         let config_file = if crate::core::runstate::RUN_STATE.state().is_admin {
             Config::generate_file().await?
@@ -181,18 +229,21 @@ impl CoreManager {
         };
         #[cfg(not(target_os = "windows"))]
         let config_file = Config::generate_file().await?;
+        #[cfg(not(windows))]
         let app_handle = handle::Handle::app_handle();
         let clash_core = Config::verge().await.latest_arc().get_valid_clash_core();
-        let config_dir = dirs::app_home_dir()?;
+        let config_dir = dirs::runtime_dir()?;
         #[cfg(unix)]
         discard_unwritable_core_cache(&config_dir);
 
         #[cfg(unix)]
         let previous_mask = unsafe { tauri_plugin_clash_verge_sysinfo::libc::umask(0o077) };
+        #[cfg(not(windows))]
         let command = app_handle
             .shell()
             .sidecar(clash_core.as_str())
             .map_err(|error| anyhow::anyhow!("failed to build sidecar command for core {clash_core:?}: {error:#}"))?;
+        #[cfg(not(windows))]
         let command = command.args([
             "-d",
             dirs::path_to_str(&config_dir)?,
@@ -206,10 +257,12 @@ impl CoreManager {
             dirs::path_to_str(&sidecar_ipc)?,
         ]);
         #[cfg(windows)]
-        let command = command.env(
-            "LISTEN_NAMEDPIPE_SDDL",
-            crate::core::owner_identity::current_user_pipe_sddl()?,
-        );
+        let command = crate::core::portable::command()?.args([
+            "-d",
+            dirs::path_to_str(&config_dir)?,
+            "-f",
+            dirs::path_to_str(&config_file)?,
+        ]);
         let (mut rx, child) = command.spawn().map_err(|error| {
             anyhow::anyhow!(
                 "failed to start sidecar core {clash_core:?} with config {} and data directory {}: {error:#}",
@@ -218,7 +271,16 @@ impl CoreManager {
             )
         })?;
         let (terminated, termination) = tokio::sync::oneshot::channel();
-        *self.sidecar_exit.lock().await = Some(execution.release_after_exit(child.pid(), termination));
+        #[cfg(not(windows))]
+        {
+            *self.sidecar_exit.lock().await = Some(execution.release_after_exit(child.pid(), termination));
+        }
+        #[cfg(windows)]
+        {
+            *self.sidecar_exit.lock().await = Some(tokio::spawn(async move {
+                let _ = termination.await;
+            }));
+        }
         #[cfg(target_os = "windows")]
         let job = {
             match create_and_assign_sidecar_job(child.pid()) {
@@ -252,12 +314,20 @@ impl CoreManager {
         // single event, so an unread channel stalls its reader threads and the core blocks on a
         // full stdout pipe before it ever creates the API socket.
         let core_readiness_generation = self.mark_core_ready();
+        #[cfg(windows)]
+        let port_conflict = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        #[cfg(windows)]
+        let observed_conflict = std::sync::Arc::clone(&port_conflict);
         AsyncHandler::spawn(move || async move {
             while let Some(event) = rx.recv().await {
                 match event {
                     tauri_plugin_shell::process::CommandEvent::Stdout(line)
                     | tauri_plugin_shell::process::CommandEvent::Stderr(line) => {
                         let message = String::from_utf8_lossy_owned(line);
+                        #[cfg(windows)]
+                        if crate::core::portable::is_port_conflict(&message) {
+                            observed_conflict.store(true, std::sync::atomic::Ordering::Release);
+                        }
                         Logger::global().writer_sidecar_log(Level::Error, &message);
                         CLASH_LOGGER.append_log(message);
                     }
@@ -282,23 +352,48 @@ impl CoreManager {
             }
         });
 
+        #[cfg(windows)]
+        let mixed_port = crate::config::MixedPort::desired().await;
         let readiness = poll_sidecar_readiness(SIDECAR_READINESS_ATTEMPTS, SIDECAR_READINESS_INTERVAL, || async {
             tokio::time::timeout(SIDECAR_READINESS_PROBE_TIMEOUT, async {
                 handle::Handle::mihomo().get_version().await
             })
             .await
             .context("Mihomo readiness probe timed out")??;
+            #[cfg(windows)]
+            {
+                let owner = AsyncHandler::spawn_blocking(move || {
+                    crate::core::listener::loopback_tcp_listener_owner(mixed_port)
+                })
+                .await
+                .context("proxy listener ownership query did not finish")??;
+                match owner {
+                    Some(owner) if owner == pid => {}
+                    Some(_) => return Err(crate::core::portable::PortConflict.into()),
+                    None => anyhow::bail!("the owned core has not opened its loopback proxy listener"),
+                }
+                if port_conflict.load(std::sync::atomic::Ordering::Acquire) {
+                    return Err(crate::core::portable::PortConflict.into());
+                }
+            }
             Ok(())
         })
         .await;
         if let Err(readiness_error) = readiness {
+            #[cfg(windows)]
+            let readiness_error = if port_conflict.load(std::sync::atomic::Ordering::Acquire) {
+                anyhow::Error::new(crate::core::portable::PortConflict).context(readiness_error)
+            } else {
+                readiness_error
+            };
             proxy_control::stop_guard().await;
             self.core_stopped();
             return match child.kill() {
                 Ok(()) => Err(readiness_error),
-                Err(kill_error) => Err(anyhow::anyhow!(
-                    "{readiness_error:#}; failed to terminate unready sidecar PID {pid}: {kill_error:#}"
-                )),
+                Err(kill_error) => {
+                    Err(readiness_error
+                        .context(format!("failed to terminate unready sidecar PID {pid}: {kill_error:#}")))
+                }
             };
         }
 
@@ -564,6 +659,20 @@ mod readiness_tests {
         );
         assert_eq!(failed_attempts.load(Ordering::SeqCst), 3);
         Ok(())
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn sidecar_port_conflict_stops_readiness_before_restarting_the_core() {
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let probe_attempts = Arc::clone(&attempts);
+        let result = poll_sidecar_readiness(3, Duration::ZERO, move || {
+            probe_attempts.fetch_add(1, Ordering::SeqCst);
+            async { Err(crate::core::portable::PortConflict.into()) }
+        })
+        .await;
+        assert!(result.is_err_and(|error| error.is::<crate::core::portable::PortConflict>()));
+        assert_eq!(attempts.load(Ordering::SeqCst), 1);
     }
 
     #[test]

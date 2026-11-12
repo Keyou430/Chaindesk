@@ -10,6 +10,10 @@ pub mod manager;
 pub mod network_watch;
 pub mod notify;
 pub(crate) mod owner_identity;
+#[cfg(windows)]
+pub(crate) mod portable;
+#[cfg(windows)]
+mod portable_proxy;
 pub mod proxy_control;
 pub mod proxy_view;
 pub mod runstate;

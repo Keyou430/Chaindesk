@@ -1,10 +1,11 @@
-param([switch]$PinnedMsvc)
+param([switch]$PinnedMsvc, [switch]$Portable)
 
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $projectRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 . (Join-Path $PSScriptRoot 'bootstrap.ps1')
 $env:NODE_OPTIONS = '--max-old-space-size=4096'
+$buildName = if ($Portable) { 'portable' } else { 'baseline' }
 
 $vsWhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
 $vsRoot = & $vsWhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
@@ -39,21 +40,21 @@ $environmentJson = [ordered]@{
     windowsSdkVersion = $env:WindowsSDKVersion.TrimEnd([System.IO.Path]::DirectorySeparatorChar)
     vsShellDirectory = $vsRoot
 } | ConvertTo-Json -Depth 4
-[System.IO.File]::WriteAllText((Join-Path $outputRoot 'logs/build-environment.json'), $environmentJson, [System.Text.UTF8Encoding]::new($false))
-$buildConfiguration = Join-Path $outputRoot 'tauri-baseline.json'
+$environmentName = if ($Portable) { 'logs/portable-build-environment.json' } else { 'logs/build-environment.json' }
+[System.IO.File]::WriteAllText((Join-Path $outputRoot $environmentName), $environmentJson, [System.Text.UTF8Encoding]::new($false))
+$buildConfiguration = Join-Path $outputRoot "tauri-$buildName.json"
 $configurationJson = @{ bundle = @{ active = $false; externalBin = @(); resources = @() } } | ConvertTo-Json -Depth 4
 [System.IO.File]::WriteAllText($buildConfiguration, $configurationJson, [System.Text.UTF8Encoding]::new($false))
 
-# This builds the unchanged application sources without packaging or launching them.
-# Its upstream identity is unsafe to run alongside a user's installed client.
+# Packaging and application startup remain separate from the native build.
 Push-Location $projectRoot
 try {
-    & pnpm.exe exec tauri build --debug --no-bundle --config $buildConfiguration -- --locked -j 4 @cargoVerbosity *> (Join-Path $outputRoot 'logs/baseline-build.log')
+    & pnpm.exe exec tauri build --debug --no-bundle --config $buildConfiguration -- --locked -j 4 @cargoVerbosity *> (Join-Path $outputRoot "logs/$buildName-build.log")
     if ($LASTEXITCODE -ne 0) {
-        Get-Content -LiteralPath (Join-Path $outputRoot 'logs/baseline-build.log') -Encoding UTF8 -Tail 45
-        throw 'Baseline build failed; see .chaindesk/logs/baseline-build.log'
+        Get-Content -LiteralPath (Join-Path $outputRoot "logs/$buildName-build.log") -Encoding UTF8 -Tail 45
+        throw "$buildName build failed; see .chaindesk/logs/$buildName-build.log"
     }
-    Get-Content -LiteralPath (Join-Path $outputRoot 'logs/baseline-build.log') -Encoding UTF8 -Tail 12
+    Get-Content -LiteralPath (Join-Path $outputRoot "logs/$buildName-build.log") -Encoding UTF8 -Tail 12
 } finally {
     Pop-Location
 }

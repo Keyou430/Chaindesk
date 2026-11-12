@@ -339,6 +339,8 @@ impl IVerge {
                     {
                         config.start_page = Some(String::from("/"));
                     }
+                    #[cfg(windows)]
+                    config.apply_portable_defaults();
                     config
                 }
                 Err(err) => {
@@ -403,7 +405,7 @@ impl IVerge {
             use_default_bypass: Some(true),
             proxy_guard_duration: Some(30),
             auto_close_connection: Some(true),
-            auto_check_update: Some(true),
+            auto_check_update: Some(!cfg!(windows)),
             enable_builtin_enhanced: Some(true),
             auto_log_clean: Some(2), // 1: 1天, 2: 7天, 3: 30天, 4: 90天
             enable_auto_backup_schedule: Some(false),
@@ -428,6 +430,18 @@ impl IVerge {
 
     pub async fn save_file(&self) -> Result<()> {
         help::save_yaml(&dirs::verge_path()?, &self, Some("# Clash Verge Config")).await
+    }
+
+    #[cfg(windows)]
+    fn apply_portable_defaults(&mut self) {
+        self.enable_tun_mode = Some(false);
+        self.enable_auto_launch = Some(false);
+        self.enable_proxy_guard = Some(false);
+        self.auto_check_update = Some(false);
+        self.enable_external_controller = Some(false);
+        self.proxy_host = Some("127.0.0.1".into());
+        self.clash_core = Some("verge-mihomo".into());
+        self.startup_script = None;
     }
 
     #[allow(clippy::cognitive_complexity)]

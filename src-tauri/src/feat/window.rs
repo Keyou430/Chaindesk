@@ -195,6 +195,14 @@ pub async fn clean_async() -> CleanupResult {
     .await;
     result.stop_error = stop_error.into_inner();
 
+    #[cfg(windows)]
+    if result.core_stopped
+        && let Err(error) = crate::core::portable::cleanup()
+    {
+        result.all_success = false;
+        logging!(warn, Type::System, "Portable session cleanup failed: {error:#}");
+    }
+
     logging!(
         info,
         Type::System,

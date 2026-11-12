@@ -1,34 +1,20 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "identifier": "io.github.clash-verge-rev.clash-verge-rev",
+  "identifier": "local.chaindesk.portable",
   "bundle": {
-    "targets": ["nsis"],
+    "active": false,
+    "externalBin": [],
+    "targets": [],
     "windows": {
-      "certificateThumbprint": null,
-      "digestAlgorithm": "sha256",
-      "timestampUrl": "",
       "webviewInstallMode": {
-        "type": "embedBootstrapper",
-        "silent": true
-      },
-      "nsis": {
-        "displayLanguageSelector": true,
-        "installerIcon": "icons/icon.ico",
-        "languages": ["SimpChinese", "English", "Russian"],
-        "installMode": "perMachine",
-        "installerHooks": "./packages/windows/core-hashes.nsh",
-        "template": "./packages/windows/installer.nsi"
+        "type": "skip"
       }
     }
   },
   "app": {
     "windows": [],
     "security": {
-      "capabilities": [
-        "desktop-capability",
-        "desktop-windows-capability",
-        "migrated"
-      ]
+      "capabilities": ["portable"]
     }
   }
 }

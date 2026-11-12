@@ -24,7 +24,19 @@ pub async fn copy_clash_env() -> CmdResult {
 #[tauri::command]
 #[specta::specta]
 pub async fn get_clash_info() -> CmdResult<ClashInfo> {
-    Ok(Config::clash().await.data_arc().get_client_info())
+    let mut info = Config::clash().await.data_arc().get_client_info();
+    #[cfg(windows)]
+    {
+        info.mixed_port = crate::config::MixedPort::effective().await;
+        info.socks_port = 0;
+        info.port = 0;
+        info.server = format!(
+            "127.0.0.1:{}",
+            crate::core::portable::controller().stringify_err()?.port()
+        );
+        info.secret = None;
+    }
+    Ok(info)
 }
 
 #[tauri::command]

@@ -506,6 +506,9 @@ pub async fn init_config() -> Result<()> {
 
 /// Initializes application resources after Tauri setup.
 pub async fn init_resources() -> Result<()> {
+    if cfg!(windows) {
+        return Ok(());
+    }
     let app_dir = dirs::app_home_dir()?;
     let res_dir = dirs::app_resources_dir()?;
 

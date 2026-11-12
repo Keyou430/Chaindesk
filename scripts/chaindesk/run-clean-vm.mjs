@@ -28,8 +28,18 @@ import {
 } from './baseline.mjs'
 
 const { values } = parseArgs({
-  options: { image: { type: 'string' }, 'qemu-root': { type: 'string' } },
+  options: {
+    image: { type: 'string' },
+    'qemu-root': { type: 'string' },
+    milestone: { type: 'string', default: 'm0' },
+    'base-evidence': { type: 'string' },
+    'original-app': { type: 'string' },
+  },
 })
+assert.ok(['m0', 'm1'].includes(values.milestone), 'Unsupported VM milestone')
+const portable = values.milestone === 'm1'
+const reuseGuest = portable && values['base-evidence'] !== undefined
+const logPrefix = portable ? 'portable-vm' : 'clean-vm'
 const baseline = await readBaseline()
 await verifySource(baseline)
 const environment = baseline.cleanVmEnvironment
@@ -48,66 +58,112 @@ for (const file of environment.qemu.files) {
   await verifyFile(path.join(qemuRoot, file.path), file.sha256)
 }
 await mkdir(cache, { recursive: true })
-const runDirectory = await mkdtemp(path.join(cache, 'm0-'))
+const runDirectory = await mkdtemp(path.join(cache, `${values.milestone}-`))
 const answerDirectory = path.join(runDirectory, 'answer')
 await mkdir(path.join(answerDirectory, 'M0'), { recursive: true })
 const logDirectory = path.join(projectRoot, '.chaindesk', 'logs')
 await mkdir(logDirectory, { recursive: true })
 const payloadPath = path.join(runDirectory, 'payload.zip')
-const runtimeDirectory = `Microsoft.WebView2.FixedVersionRuntime.${baseline.artifacts.webview2.version}.x64`
-const runtimeRoot = path.join(cache, 'payload', 'runtime', runtimeDirectory)
-await verifyFile(
-  path.join(runtimeRoot, 'msedgewebview2.exe'),
-  baseline.artifacts.webview2.mainExecutable.sha256,
-)
-const applicationPath = path.join(
-  cache,
-  '..',
-  'target',
-  'debug',
-  'clash-verge.exe',
-)
-const corePath = path.join(
-  projectRoot,
-  'src-tauri',
-  'sidecar',
-  `verge-mihomo-${baseline.toolchain.rustTarget}.exe`,
-)
-await verifyFile(corePath, baseline.artifacts.core.files[0].sha256)
-const files = []
-{
-  const archive = new AdmZip()
-  for (const [source, target, expectedHash] of [
-    [applicationPath, 'clash-verge.exe'],
-    [corePath, 'verge-mihomo.exe', baseline.artifacts.core.files[0].sha256],
-    ...baseline.artifacts.rules.assets.map((asset) => [
-      path.join(projectRoot, 'src-tauri', 'resources', asset.name),
-      `resources/${asset.name}`,
-      asset.sha256,
-    ]),
-  ]) {
-    if (expectedHash) await verifyFile(source, expectedHash)
-    const bytes = await readFile(source)
-    files.push({
-      path: target,
-      sha256: createHash('sha256').update(bytes).digest('hex'),
-    })
-    archive.addFile(target, bytes)
+let manifest
+let backingRun
+if (portable) {
+  const pointer = JSON.parse(
+    await readFile(
+      path.join(projectRoot, '.chaindesk/m1-package.json'),
+      'utf8',
+    ),
+  )
+  manifest = JSON.parse(await readFile(pointer.manifestPath, 'utf8'))
+  assert.equal(manifest.milestone, 'M1')
+  manifest.originalApplicationSha256 =
+    baseline.cleanVmEnvironment.acceptedApplicationSha256
+  const original = path.resolve(
+    projectRoot,
+    values['original-app'] ??
+      '.chaindesk/m0-closure/accepted-baseline/clash-verge.exe',
+  )
+  await verifyFile(original, manifest.originalApplicationSha256)
+  await copyFile(original, path.join(runDirectory, 'original.exe'))
+  for (const file of manifest.sourceFiles) {
+    await verifyFile(path.join(projectRoot, file.path), file.sha256)
   }
-  archive.addLocalFolder(runtimeRoot, 'runtime')
-  files.push({
-    path: 'runtime/msedgewebview2.exe',
-    sha256: baseline.artifacts.webview2.mainExecutable.sha256,
-  })
-  archive.writeZip(payloadPath)
-}
-const digest = createHash('sha256')
-for await (const chunk of createReadStream(payloadPath)) digest.update(chunk)
-const manifest = {
-  sourceCommit: baseline.source.commit,
-  archiveSha256: digest.digest('hex'),
-  runtimeDirectory: 'runtime',
-  files,
+  await verifyFile(pointer.archivePath, manifest.archiveSha256)
+  await copyFile(pointer.archivePath, payloadPath)
+  await verifyFile(payloadPath, manifest.archiveSha256)
+  if (reuseGuest) {
+    const accepted = JSON.parse(
+      await readFile(
+        path.resolve(
+          projectRoot,
+          values['base-evidence'] ?? '.chaindesk/logs/clean-vm-evidence.json',
+        ),
+        'utf8',
+      ),
+    )
+    backingRun = accepted.runDirectory
+    assert.equal(
+      accepted.guestResult.guestPoweredOff,
+      true,
+      'Only a cleanly powered-off guest may be reused',
+    )
+    assert.equal(accepted.image.sha256, environment.image.sha256)
+  }
+} else {
+  const runtimeDirectory = `Microsoft.WebView2.FixedVersionRuntime.${baseline.artifacts.webview2.version}.x64`
+  const runtimeRoot = path.join(cache, 'payload', 'runtime', runtimeDirectory)
+  await verifyFile(
+    path.join(runtimeRoot, 'msedgewebview2.exe'),
+    baseline.artifacts.webview2.mainExecutable.sha256,
+  )
+  const applicationPath = path.join(
+    cache,
+    '..',
+    'target',
+    'debug',
+    'clash-verge.exe',
+  )
+  const corePath = path.join(
+    projectRoot,
+    'src-tauri',
+    'sidecar',
+    `verge-mihomo-${baseline.toolchain.rustTarget}.exe`,
+  )
+  await verifyFile(corePath, baseline.artifacts.core.files[0].sha256)
+  const files = []
+  {
+    const archive = new AdmZip()
+    for (const [source, target, expectedHash] of [
+      [applicationPath, 'clash-verge.exe'],
+      [corePath, 'verge-mihomo.exe', baseline.artifacts.core.files[0].sha256],
+      ...baseline.artifacts.rules.assets.map((asset) => [
+        path.join(projectRoot, 'src-tauri', 'resources', asset.name),
+        `resources/${asset.name}`,
+        asset.sha256,
+      ]),
+    ]) {
+      if (expectedHash) await verifyFile(source, expectedHash)
+      const bytes = await readFile(source)
+      files.push({
+        path: target,
+        sha256: createHash('sha256').update(bytes).digest('hex'),
+      })
+      archive.addFile(target, bytes)
+    }
+    archive.addLocalFolder(runtimeRoot, 'runtime')
+    files.push({
+      path: 'runtime/msedgewebview2.exe',
+      sha256: baseline.artifacts.webview2.mainExecutable.sha256,
+    })
+    archive.writeZip(payloadPath)
+  }
+  const digest = createHash('sha256')
+  for await (const chunk of createReadStream(payloadPath)) digest.update(chunk)
+  manifest = {
+    sourceCommit: baseline.source.commit,
+    archiveSha256: digest.digest('hex'),
+    runtimeDirectory: 'runtime',
+    files,
+  }
 }
 await writeFile(
   path.join(runDirectory, 'manifest.json'),
@@ -129,7 +185,59 @@ const server = http.createServer(async (request, response) => {
         .end('chaindesk-m0-proxy-ok')
     } else if (
       request.method === 'GET' &&
-      ['payload.zip', 'manifest.json'].includes(resource)
+      portable &&
+      ['boot.ps1', 'accept-portable-vm.ps1', 'vm-debugger.ps1'].includes(
+        resource,
+      )
+    ) {
+      const content =
+        resource === 'boot.ps1'
+          ? [
+              "$ErrorActionPreference = 'Stop'",
+              "if ($env:COMPUTERNAME -ne 'CHAINDESK-M0' -or (Get-CimInstance Win32_ComputerSystem).Manufacturer -notmatch 'QEMU') { throw 'Disposable guest required' }",
+              'New-Item -ItemType Directory -Force C:\\M0\\M1 | Out-Null',
+              "[IO.File]::WriteAllText('C:\\M0\\accept-clean-vm.ps1', 'exit')",
+              ...['accept-portable-vm.ps1', 'vm-debugger.ps1'].map(
+                (file) =>
+                  `Invoke-WebRequest -UseBasicParsing -Uri '${controller}/${file}' -OutFile 'C:\\M0\\M1\\${file}'`,
+              ),
+              `& 'C:\\M0\\M1\\accept-portable-vm.ps1' -Controller '${controller}'`,
+            ].join('\r\n')
+          : await readFile(
+              path.join(projectRoot, 'scripts/chaindesk', resource),
+              'utf8',
+            )
+      response
+        .writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' })
+        .end(content)
+    } else if (
+      request.method === 'POST' &&
+      portable &&
+      resource === 'control'
+    ) {
+      let body = ''
+      for await (const chunk of request) {
+        body += chunk
+        assert.ok(body.length < 8192)
+      }
+      const input = JSON.parse(body)
+      assert.ok(
+        ['send-key', 'screendump', 'query-status'].includes(input.execute),
+      )
+      const args =
+        input.execute === 'screendump'
+          ? { filename: path.join(runDirectory, 'latest-screen.ppm') }
+          : input.arguments
+      response
+        .writeHead(200, { 'Content-Type': 'application/json' })
+        .end(JSON.stringify(await command(input.execute, args)))
+    } else if (
+      request.method === 'GET' &&
+      [
+        'payload.zip',
+        'manifest.json',
+        ...(portable ? ['original.exe'] : []),
+      ].includes(resource)
     ) {
       const target = path.join(runDirectory, resource)
       response.writeHead(200, {
@@ -142,7 +250,9 @@ const server = http.createServer(async (request, response) => {
       createReadStream(target).pipe(response)
     } else if (
       request.method === 'POST' &&
-      ['result', 'screenshot'].includes(resource)
+      ['result', 'screenshot', ...(portable ? ['progress'] : [])].includes(
+        resource,
+      )
     ) {
       const chunks = []
       let length = 0
@@ -158,11 +268,14 @@ const server = http.createServer(async (request, response) => {
       await writeFile(
         path.join(
           logDirectory,
-          resource === 'result' ? 'clean-vm-result.json' : 'clean-vm.png',
+          resource === 'screenshot'
+            ? `${logPrefix}.png`
+            : `${logPrefix}-${resource}.json`,
         ),
         evidence,
       )
       response.writeHead(200).end('OK')
+      if (resource === 'progress') console.log(evidence.toString('utf8'))
       if (resource === 'result') complete(JSON.parse(evidence.toString('utf8')))
     } else {
       response.writeHead(404).end()
@@ -175,41 +288,78 @@ const server = http.createServer(async (request, response) => {
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
 const forwardPort = server.address().port
 const controller = `http://10.0.2.2:${forwardPort}/${nonce}`
+if (portable)
+  await writeFile(
+    path.join(logDirectory, 'portable-vm-control.json'),
+    JSON.stringify({
+      endpoint: `http://127.0.0.1:${forwardPort}/${nonce}/control`,
+      controller,
+      runDirectory,
+      backingRun,
+    }),
+  )
+if (!reuseGuest) {
+  const acceptanceDirectory = path.join(
+    answerDirectory,
+    'M0',
+    ...(portable ? ['M1'] : []),
+  )
+  await mkdir(acceptanceDirectory, { recursive: true })
+  const harness = portable ? 'accept-portable-vm.ps1' : 'accept-clean-vm.ps1'
+  await copyFile(
+    path.join(projectRoot, 'scripts/chaindesk', harness),
+    path.join(acceptanceDirectory, harness),
+  )
+  await copyFile(
+    path.join(projectRoot, 'scripts/chaindesk/vm-debugger.ps1'),
+    path.join(acceptanceDirectory, 'vm-debugger.ps1'),
+  )
+  const guestHarness = `C:\\M0\\${portable ? 'M1\\' : ''}${harness}`
+  await writeFile(
+    path.join(answerDirectory, 'M0', 'prepare.cmd'),
+    [
+      '@echo off',
+      'powershell.exe -NoProfile -Command "if ((Get-CimInstance Win32_ComputerSystem).Manufacturer -notmatch \'QEMU\') { exit 2 }"',
+      'if errorlevel 1 exit /b 2',
+      'mkdir C:\\M0',
+      'xcopy "%~dp0*" C:\\M0\\ /E /I /Y',
+      'icacls C:\\M0 /grant "*S-1-5-32-545:(OI)(CI)M" /T',
+      `reg.exe add HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run /v M0Acceptance /t REG_SZ /d "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${guestHarness} -Controller ${controller}" /f`,
+    ].join('\r\n'),
+  )
+  const template = await readFile(
+    path.join(projectRoot, 'scripts', 'chaindesk', 'clean-vm-unattend.xml'),
+    'utf8',
+  )
+  await writeFile(
+    path.join(answerDirectory, 'autounattend.xml'),
+    template.replaceAll(
+      '{{testPassword}}',
+      `M0${randomBytes(16).toString('hex')}!`,
+    ),
+  )
+}
 await copyFile(
-  path.join(projectRoot, 'scripts', 'chaindesk', 'accept-clean-vm.ps1'),
-  path.join(answerDirectory, 'M0', 'accept-clean-vm.ps1'),
-)
-await writeFile(
-  path.join(answerDirectory, 'M0', 'prepare.cmd'),
-  [
-    '@echo off',
-    'powershell.exe -NoProfile -Command "if ((Get-CimInstance Win32_ComputerSystem).Manufacturer -notmatch \'QEMU\') { exit 2 }"',
-    'if errorlevel 1 exit /b 2',
-    'mkdir C:\\M0',
-    'xcopy "%~dp0*" C:\\M0\\ /E /I /Y',
-    'icacls C:\\M0 /grant "*S-1-5-32-545:(OI)(CI)M" /T',
-    `reg.exe add HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run /v M0Acceptance /t REG_SZ /d "powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\M0\\accept-clean-vm.ps1 -Controller ${controller}" /f`,
-  ].join('\r\n'),
-)
-const template = await readFile(
-  path.join(projectRoot, 'scripts', 'chaindesk', 'clean-vm-unattend.xml'),
-  'utf8',
-)
-await writeFile(
-  path.join(answerDirectory, 'autounattend.xml'),
-  template.replaceAll(
-    '{{testPassword}}',
-    `M0${randomBytes(16).toString('hex')}!`,
-  ),
-)
-await copyFile(
-  path.join(qemuRoot, 'share', 'edk2-i386-vars.fd'),
+  reuseGuest
+    ? path.join(backingRun, 'vars.fd')
+    : path.join(qemuRoot, 'share', 'edk2-i386-vars.fd'),
   path.join(runDirectory, 'vars.fd'),
 )
 const disk = path.join(runDirectory, 'system.qcow2')
 execFileSync(
   path.join(qemuRoot, 'qemu-img.exe'),
-  ['create', '-f', 'qcow2', disk, '64G'],
+  reuseGuest
+    ? [
+        'create',
+        '-f',
+        'qcow2',
+        '-F',
+        'qcow2',
+        '-b',
+        path.join(backingRun, 'system.qcow2'),
+        disk,
+      ]
+    : ['create', '-f', 'qcow2', disk, '64G'],
   { windowsHide: true, stdio: 'pipe' },
 )
 
@@ -218,6 +368,7 @@ let commandId = 0
 const pending = new Map()
 let ready
 let resetRequested = false
+let shutdownReason
 const qmpServer = net.createServer((connection) => {
   monitor = connection
   const lines = readline.createInterface({ input: connection })
@@ -226,6 +377,7 @@ const qmpServer = net.createServer((connection) => {
     const message = JSON.parse(line)
     if (message.QMP) ready()
     if (message.event === 'SHUTDOWN') {
+      shutdownReason = message.data.reason
       resetRequested = message.data.reason === 'guest-reset'
     }
     if (pending.has(message.id)) {
@@ -270,15 +422,20 @@ const arguments_ = [
   '-drive',
   `if=pflash,format=raw,file=${path.join(runDirectory, 'vars.fd')}`,
   '-drive',
-  `if=ide,format=qcow2,file=${disk}`,
-  '-drive',
-  `if=ide,media=cdrom,readonly=on,file=${image}`,
+  `if=ide,format=qcow2,cache=writethrough,file=${disk}`,
+  ...(!reuseGuest
+    ? ['-drive', `if=ide,media=cdrom,readonly=on,file=${image}`]
+    : []),
   '-device',
   'qemu-xhci',
-  '-drive',
-  `if=none,id=answer,format=raw,file=fat:rw:${answerDirectory.replaceAll('\\', '/')}`,
-  '-device',
-  'usb-storage,drive=answer,removable=on',
+  ...(!reuseGuest
+    ? [
+        '-drive',
+        `if=none,id=answer,format=raw,file=fat:rw:${answerDirectory.replaceAll('\\', '/')}`,
+        '-device',
+        'usb-storage,drive=answer,removable=on',
+      ]
+    : []),
   '-nic',
   'user,model=e1000e',
   // WHPX 11.1 does not reset all processor state; restart QEMU on guest reset.
@@ -286,11 +443,13 @@ const arguments_ = [
   '-qmp',
   `tcp:127.0.0.1:${qmpServer.address().port}`,
 ]
-const log = createWriteStream(path.join(logDirectory, 'clean-vm-qemu.log'))
+const log = createWriteStream(path.join(logDirectory, `${logPrefix}-qemu.log`))
 console.log(
   JSON.stringify({
     phase: 'guestStarting',
     runDirectory,
+    backingRun,
+    milestone: values.milestone,
     accelerator: 'whpx',
     networking: 'userNatWithLoopbackController',
     platformSecurityAcceptance: false,
@@ -305,6 +464,7 @@ try {
   let result
   do {
     resetRequested = false
+    shutdownReason = undefined
     const connected = new Promise((resolve) => {
       ready = resolve
     })
@@ -313,7 +473,9 @@ try {
       [
         ...arguments_,
         '-boot',
-        boots === 0 ? 'order=c,once=d,menu=off' : 'order=c,menu=off',
+        boots === 0 && !reuseGuest
+          ? 'order=c,once=d,menu=off'
+          : 'order=c,menu=off',
       ],
       { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] },
     )
@@ -348,7 +510,7 @@ try {
       }).catch((error) => console.error(String(error)))
     }, 30000)
     capture.unref()
-    if (boots === 0) {
+    if (boots === 0 && !reuseGuest) {
       for (let attempt = 0; attempt < 4; attempt++) {
         await delay(1000)
         await command('send-key', {
@@ -368,6 +530,12 @@ try {
         }),
       ),
     ])
+    if (result.finishedAt && guest.exitCode === null) {
+      await Promise.race([exited, delay(45000)])
+      result.guestPoweredOff =
+        guest.exitCode === 0 && shutdownReason === 'guest-shutdown'
+      result.guestShutdownReason = shutdownReason
+    }
     clearInterval(capture)
     if (result.resetRequested) monitor.destroy()
     if (result.resetRequested)
@@ -375,6 +543,8 @@ try {
   } while (result.resetRequested && boots < 5 && Date.now() < deadline)
   const hostEvidence = {
     runDirectory,
+    backingRun,
+    milestone: values.milestone,
     accelerator: 'whpx',
     qemuVersion: environment.qemu.version,
     image: environment.image,
@@ -385,7 +555,7 @@ try {
     guestResult: result,
   }
   await writeFile(
-    path.join(logDirectory, 'clean-vm-evidence.json'),
+    path.join(logDirectory, `${logPrefix}-evidence.json`),
     `${JSON.stringify(hostEvidence, null, 2)}\n`,
   )
   console.log(JSON.stringify(hostEvidence))

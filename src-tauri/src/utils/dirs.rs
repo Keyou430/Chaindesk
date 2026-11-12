@@ -8,14 +8,18 @@ use std::{
 };
 use tauri::Manager as _;
 
-#[cfg(not(feature = "verge-dev"))]
+#[cfg(windows)]
+pub static APP_ID: &str = "local.chaindesk.portable";
+#[cfg(all(not(windows), not(feature = "verge-dev")))]
 pub static APP_ID: &str = "io.github.clash-verge-rev.clash-verge-rev";
-#[cfg(not(feature = "verge-dev"))]
+#[cfg(windows)]
+pub static BACKUP_DIR: &str = "backups";
+#[cfg(all(not(windows), not(feature = "verge-dev")))]
 pub static BACKUP_DIR: &str = "clash-verge-rev-backup";
 
-#[cfg(feature = "verge-dev")]
+#[cfg(all(not(windows), feature = "verge-dev"))]
 pub static APP_ID: &str = "io.github.clash-verge-rev.clash-verge-rev.dev";
-#[cfg(feature = "verge-dev")]
+#[cfg(all(not(windows), feature = "verge-dev"))]
 pub static BACKUP_DIR: &str = "clash-verge-rev-backup-dev";
 
 pub static CLASH_CONFIG: &str = "config.yaml";
@@ -26,6 +30,9 @@ pub static UPDATE_INTERVAL_MIGRATED: &str = ".update-interval-migrated";
 
 /// Uses the same platform data resolver as Tauri, including before its handle exists.
 pub fn app_home_dir() -> Result<PathBuf> {
+    #[cfg(windows)]
+    return Ok(super::portable::paths()?.data.clone());
+    #[cfg(not(windows))]
     ::dirs::data_dir()
         .map(|root| root.join(APP_ID))
         .ok_or_else(|| anyhow::anyhow!("Failed to get the app home directory"))
@@ -36,6 +43,10 @@ pub fn preinit_app_data_dir() -> Result<PathBuf> {
 }
 
 pub fn app_resources_dir() -> Result<PathBuf> {
+    #[cfg(windows)]
+    if cfg!(windows) {
+        return Ok(super::portable::paths()?.root.join("resources").join("rules"));
+    }
     let app_handle = handle::Handle::app_handle();
 
     match app_handle.path().resource_dir() {
@@ -76,6 +87,13 @@ pub fn find_target_icons(target: &str) -> Result<Option<String>> {
 
 pub fn app_logs_dir() -> Result<PathBuf> {
     Ok(app_home_dir()?.join("logs"))
+}
+
+pub(crate) fn runtime_dir() -> Result<PathBuf> {
+    #[cfg(windows)]
+    return Ok(crate::core::portable::controller()?.directory.clone());
+    #[cfg(not(windows))]
+    app_home_dir()
 }
 
 #[cfg(target_os = "macos")]

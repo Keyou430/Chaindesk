@@ -110,6 +110,9 @@ pub async fn resolve_reset_async() -> Result<(), anyhow::Error> {
 }
 
 fn init_scheme() {
+    if cfg!(windows) {
+        return;
+    }
     logging_error!(Type::Setup, init::init_scheme());
 }
 
@@ -146,6 +149,9 @@ async fn init_resources() {
 }
 
 async fn init_startup_script() {
+    if cfg!(windows) {
+        return;
+    }
     logging_error!(Type::Setup, init::startup_script().await);
 }
 
@@ -167,6 +173,9 @@ async fn init_auto_backup() {
 }
 
 async fn init_silent_updater() {
+    if cfg!(windows) {
+        return;
+    }
     use crate::core::SilentUpdater;
     use crate::core::handle::Handle;
 

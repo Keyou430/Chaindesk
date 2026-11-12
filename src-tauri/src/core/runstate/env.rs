@@ -27,6 +27,9 @@ pub struct RealEnv;
 
 impl RunStateEnv for RealEnv {
     async fn probe_service_version(&self) -> Result<ServiceVersionReply> {
+        if cfg!(windows) {
+            anyhow::bail!("ChainDesk portable mode does not use installed proxy services");
+        }
         // The IPC client would otherwise back off for about two minutes before failing.
         #[cfg(windows)]
         if let Some(reason) = tokio::task::spawn_blocking(crate::core::service::service_stop_reason)
@@ -70,6 +73,9 @@ impl RunStateEnv for RealEnv {
     }
 
     async fn trusted_install_evidence(&self) -> Result<bool> {
+        if cfg!(windows) {
+            return Ok(false);
+        }
         let registered = tokio::task::spawn_blocking(crate::core::service::trusted_service_evidence)
             .await
             .context("service registration probe did not finish")??;
@@ -108,6 +114,9 @@ impl RunStateEnv for RealEnv {
     }
 
     fn run_privileged(&self, action: PendingAction) -> Result<()> {
+        if cfg!(windows) {
+            anyhow::bail!("ChainDesk portable mode does not install or modify proxy services");
+        }
         crate::core::service::run_privileged_service_action(action)
     }
 }

@@ -29,6 +29,23 @@ static PENDING_FALLBACK_NOTICE: Mutex<Option<MixedPortFallback>> = Mutex::new(No
 static STARTUP_CORE_BLOCK_REASON: Mutex<Option<String>> = Mutex::new(None);
 
 impl Config {
+    #[cfg(windows)]
+    pub(crate) async fn resolve_sidecar_port_race() -> Result<()> {
+        let port = MixedPort::desired().await;
+        if std::net::TcpListener::bind(("127.0.0.1", port)).is_ok() {
+            return Ok(());
+        }
+        let reserved = std::collections::HashSet::from([crate::core::portable::controller()?.port()]);
+        let next = find_next_available_port(port, &reserved, |candidate| {
+            std::net::TcpListener::bind(("127.0.0.1", candidate)).is_ok()
+        })
+        .ok_or_else(|| anyhow!("no free loopback proxy port is available"))?;
+        MixedPort::set_session_fallback(next);
+        record_fallback(port, next);
+        Self::notify_startup_mixed_port_fallback();
+        Ok(())
+    }
+
     pub(crate) async fn resolve_startup_mixed_port() -> Result<bool> {
         let _config_write = Self::lock_config_write().await;
         let clash = Self::clash().await.latest_arc();
