@@ -134,6 +134,8 @@ pub async fn save_yaml_str(path: &Path, yaml_str: &str) -> Result<()> {
 #[cfg(windows)]
 pub(crate) fn save_private_bytes(path: &Path, bytes: &[u8]) -> Result<()> {
     use std::io::Write as _;
+    use std::os::windows::ffi::OsStrExt as _;
+    use windows_sys::Win32::Storage::FileSystem::{MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, MoveFileExW};
 
     let temporary = path.with_extension(format!("tmp-{}", super::server::random_token()?));
     let cleanup = guard(temporary, |path| {
@@ -143,7 +145,19 @@ pub(crate) fn save_private_bytes(path: &Path, bytes: &[u8]) -> Result<()> {
     file.write_all(bytes)?;
     file.sync_all()?;
     drop(file);
-    std::fs::rename(cleanup.as_path(), path)?;
+    let [source, destination] =
+        [cleanup.as_path(), path].map(|path| path.as_os_str().encode_wide().chain(Some(0)).collect::<Vec<_>>());
+    if unsafe {
+        MoveFileExW(
+            source.as_ptr(),
+            destination.as_ptr(),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+        )
+    } == 0
+    {
+        return Err(std::io::Error::last_os_error())
+            .context("could not durably replace the private application record");
+    }
     let _ = ScopeGuard::into_inner(cleanup);
     Ok(())
 }

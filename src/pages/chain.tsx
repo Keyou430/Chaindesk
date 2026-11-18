@@ -5,18 +5,26 @@ import {
   Checkbox,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControlLabel,
   Paper,
   Stack,
   TextField,
   Typography,
 } from '@mui/material'
-import { open } from '@tauri-apps/plugin-dialog'
+import { open, save } from '@tauri-apps/plugin-dialog'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { BasePage } from '@/components/base'
-import type { ChainPhase, RulePreset } from '@/services/bindings'
+import type {
+  ChainPhase,
+  DiagnosticPreview,
+  RulePreset,
+} from '@/services/bindings'
 import {
   cancelChainConnection,
   connectChain,
@@ -26,7 +34,12 @@ import {
   getChainState,
   importChainFile,
   importChainHttps,
-  saveChainExit,
+  restoreChainLastGood,
+  confirmChainIpv4,
+  previewChainDiagnostics,
+  exportChainDiagnostics,
+  keepChainCurrentProxy,
+  setChainBackgroundChecks,
   updateChainSubscription,
 } from '@/services/cmds'
 import { mutate } from '@/services/mutate'
@@ -58,6 +71,11 @@ const ChainPage = () => {
   const [consent, setConsent] = useState<boolean | null>(null)
   const [replaceAuthentication, setReplaceAuthentication] = useState(false)
   const [pending, setPending] = useState(false)
+  const [automatic, setAutomatic] = useState<boolean | null>(null)
+  const [closeExisting, setCloseExisting] = useState(false)
+  const [background, setBackground] = useState<boolean | null>(null)
+  const [expected, setExpected] = useState<string | null>(null)
+  const [diagnostic, setDiagnostic] = useState<DiagnosticPreview | null>(null)
   const phase = data?.phase ?? 'unconfigured'
   const phaseLabels: Record<ChainPhase, string> = {
     unconfigured: t('home.chain.phases.unconfigured'),
@@ -83,7 +101,11 @@ const ChainPage = () => {
     remember: data?.rememberAuthentication ?? false,
   }
   const selectedId = frontId ?? data?.selectedFrontId ?? ''
+  const automaticFront = automatic ?? data?.automaticFront ?? false
   const selected = data?.fronts.find((node) => node.id === selectedId)
+  const verifiedFront = data?.fronts.find(
+    (node) => node.id === data.selectedFrontId,
+  )
   const reuseAuthentication =
     fields.requiresAuthentication &&
     !replaceAuthentication &&
@@ -91,7 +113,10 @@ const ChainPage = () => {
     fields.host === data.host &&
     Number(fields.port) === data.port
   const allowProbe = consent ?? data?.probeConsent ?? false
-  const runBackground = false
+  const runBackground =
+    (working
+      ? data?.backgroundChecks
+      : (background ?? data?.backgroundChecks)) ?? true
   const choosePreset = preset ?? data?.preset ?? 'allProxy'
   const updateField = <K extends keyof ExitDraft>(
     key: K,
@@ -123,29 +148,33 @@ const ChainPage = () => {
     })
   const connect = async () => {
     const succeeded = await perform(async () => {
-      await saveChainExit({
-        host: fields.host,
-        port: Number(fields.port),
-        username: reuseAuthentication
-          ? null
-          : fields.requiresAuthentication
-            ? fields.username
-            : '',
-        password: reuseAuthentication
-          ? null
-          : fields.requiresAuthentication
-            ? fields.password
-            : '',
-        remember: fields.remember,
-      })
       return connectChain({
         frontId: selectedId,
         preset: choosePreset,
         probeConsent: allowProbe,
         backgroundChecks: runBackground,
+        automaticFront,
+        closeExistingConnections: closeExisting,
+        expectedIpv4: expected,
+        exit: {
+          host: fields.host,
+          port: Number(fields.port),
+          username: reuseAuthentication
+            ? null
+            : fields.requiresAuthentication
+              ? fields.username
+              : '',
+          password: reuseAuthentication
+            ? null
+            : fields.requiresAuthentication
+              ? fields.password
+              : '',
+          remember: fields.remember,
+        },
       })
     })
     if (succeeded) {
+      setFrontId(null)
       setDraft(null)
       setReplaceAuthentication(false)
     }
@@ -189,7 +218,40 @@ const ChainPage = () => {
       }
     >
       <Stack spacing={2}>
-        {data.error && <Alert severity="error">{data.error.message}</Alert>}
+        {data.error && (
+          <Alert
+            severity={
+              ['EXIT_IP_INCONSISTENT', 'EXIT_IP_UNAVAILABLE'].includes(
+                data.error.code,
+              ) && phase === 'connected'
+                ? 'warning'
+                : 'error'
+            }
+          >
+            {data.error.message}
+          </Alert>
+        )}
+        {data.candidateObservation && (
+          <Alert severity="warning">
+            {t('home.chain.candidateObservation')}:{' '}
+            {data.candidateObservation.sources
+              .map(
+                (source) =>
+                  `${source.ipv4} · ${new Date(source.checkedAt).toLocaleString()} · ${source.service}`,
+              )
+              .join(' / ')}
+          </Alert>
+        )}
+        {data.error?.code === 'RESTORE_CONFLICT' && (
+          <Button
+            disabled={busy}
+            onClick={() => {
+              void perform(keepChainCurrentProxy)
+            }}
+          >
+            {t('home.chain.keepCurrent')}
+          </Button>
+        )}
         <Paper variant="outlined" sx={{ p: 2 }}>
           <Stack spacing={1.5}>
             <Typography variant="h6">{t('home.chain.subscription')}</Typography>
@@ -264,7 +326,7 @@ const ChainPage = () => {
               <TextField
                 label={t('home.chain.host')}
                 value={fields.host}
-                disabled={busy || working}
+                disabled={busy}
                 onChange={(event) => updateField('host', event.target.value)}
                 size="small"
                 fullWidth
@@ -273,7 +335,7 @@ const ChainPage = () => {
                 label={t('home.chain.port')}
                 type="number"
                 value={fields.port}
-                disabled={busy || working}
+                disabled={busy}
                 onChange={(event) => updateField('port', event.target.value)}
                 size="small"
                 sx={{ width: 140 }}
@@ -284,7 +346,7 @@ const ChainPage = () => {
               control={
                 <Checkbox
                   checked={fields.requiresAuthentication}
-                  disabled={busy || working}
+                  disabled={busy}
                   onChange={(_, checked) =>
                     updateField('requiresAuthentication', checked)
                   }
@@ -299,7 +361,7 @@ const ChainPage = () => {
                     control={
                       <Checkbox
                         checked={reuseAuthentication}
-                        disabled={busy || working}
+                        disabled={busy}
                         onChange={(_, checked) =>
                           setReplaceAuthentication(!checked)
                         }
@@ -314,7 +376,7 @@ const ChainPage = () => {
                       label={t('home.chain.username')}
                       value={fields.username}
                       autoComplete="off"
-                      disabled={busy || working}
+                      disabled={busy}
                       onChange={(event) =>
                         updateField('username', event.target.value)
                       }
@@ -326,7 +388,7 @@ const ChainPage = () => {
                       type="password"
                       value={fields.password}
                       autoComplete="new-password"
-                      disabled={busy || working}
+                      disabled={busy}
                       onChange={(event) =>
                         updateField('password', event.target.value)
                       }
@@ -339,7 +401,7 @@ const ChainPage = () => {
                   control={
                     <Checkbox
                       checked={fields.remember}
-                      disabled={busy || working}
+                      disabled={busy}
                       onChange={(_, checked) =>
                         updateField('remember', checked)
                       }
@@ -379,9 +441,14 @@ const ChainPage = () => {
               label={t('home.chain.front')}
               select
               value={selectedId}
-              disabled={busy || working}
+              disabled={busy}
               onChange={(event) => setFrontId(event.target.value)}
               size="small"
+              helperText={
+                working && frontId && frontId !== data.selectedFrontId
+                  ? t('home.chain.pendingFront')
+                  : undefined
+              }
               slotProps={{ select: { native: true } }}
             >
               <option value="">{t('home.chain.choose')}</option>
@@ -392,6 +459,17 @@ const ChainPage = () => {
                 </option>
               ))}
             </TextField>
+            {working && verifiedFront && (
+              <Typography
+                variant="body2"
+                data-testid="chain-active-front"
+                data-front-id={verifiedFront.id}
+              >
+                {t('home.chain.currentFront')}: {verifiedFront.name} ·{' '}
+                {verifiedFront.protocol} · {verifiedFront.endpoint} ·{' '}
+                {verifiedFront.id.slice(0, 6)}
+              </Typography>
+            )}
             {selected?.rejection && (
               <Alert severity="warning">{selected.rejection}</Alert>
             )}
@@ -412,7 +490,7 @@ const ChainPage = () => {
               label={t('home.chain.rules')}
               select
               value={choosePreset}
-              disabled={busy || working}
+              disabled={busy}
               onChange={(event) => setPreset(event.target.value as RulePreset)}
               size="small"
               slotProps={{ select: { native: true } }}
@@ -432,15 +510,49 @@ const ChainPage = () => {
               label={t('home.chain.consent')}
             />
 
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={automaticFront}
+                  disabled={busy}
+                  onChange={(_, value) => setAutomatic(value)}
+                />
+              }
+              label={t('home.chain.automatic')}
+            />
+            <TextField
+              label={t('home.chain.expected')}
+              value={expected ?? data.expectedIpv4 ?? ''}
+              disabled={busy}
+              onChange={(event) => setExpected(event.target.value)}
+              size="small"
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={runBackground}
+                  disabled={busy || !allowProbe}
+                  onChange={(_, value) => {
+                    if (working) {
+                      void perform(() => setChainBackgroundChecks(value))
+                    } else {
+                      setBackground(value)
+                    }
+                  }}
+                />
+              }
+              label={t('home.chain.background')}
+            />
+            <Typography variant="caption" color="text.secondary">
+              {t('home.chain.backgroundDetail')}
+            </Typography>
             <Stack direction="row" spacing={1}>
               <Button
                 data-testid="chain-connect"
                 variant="contained"
                 disabled={
                   busy ||
-                  working ||
-                  !selected ||
-                  !!selected.rejection ||
+                  (!automaticFront && (!selected || !!selected.rejection)) ||
                   !allowProbe ||
                   !fields.host ||
                   !fields.port ||
@@ -453,11 +565,11 @@ const ChainPage = () => {
                 }}
               >
                 {busy && <CircularProgress size={16} sx={{ mr: 1 }} />}
-                {t('home.chain.connect')}
+                {working ? t('home.chain.switch') : t('home.chain.connect')}
               </Button>
               <Button
                 data-testid="chain-disconnect"
-                disabled={busy || !working}
+                disabled={busy || (!working && phase !== 'recoveryRequired')}
                 onClick={() => {
                   void perform(disconnectChain)
                 }}
@@ -475,23 +587,128 @@ const ChainPage = () => {
               )}
             </Stack>
             <Box>
+              {data.healthCheckedAt && (
+                <Typography variant="caption" sx={{ display: 'block' }}>
+                  {t('home.chain.lastHealthCheck')}:{' '}
+                  {new Date(data.healthCheckedAt).toLocaleString()}
+                </Typography>
+              )}
               <Typography variant="body2">
                 {t('home.chain.observed')}:{' '}
                 {data.observation?.ipv4 ?? t('home.chain.notObserved')}
               </Typography>
-              {data.observation && (
-                <Typography variant="caption">
-                  {new Date(data.observation.checkedAt).toLocaleString()} ·{' '}
-                  {data.observation.service}
+              {data.observation?.sources.map((source) => (
+                <Typography
+                  variant="caption"
+                  sx={{ display: 'block' }}
+                  key={source.service}
+                >
+                  {source.ipv4} · {new Date(source.checkedAt).toLocaleString()}{' '}
+                  · {source.service}
                 </Typography>
-              )}
+              ))}
+              <Button
+                disabled={
+                  busy ||
+                  !data.observation?.consistent ||
+                  data.observation.sources.length !== 2
+                }
+                onClick={() => {
+                  if (data.observation) {
+                    const ipv4 = data.observation.ipv4
+                    void perform(() => confirmChainIpv4(ipv4)).then((ok) => {
+                      if (ok) setExpected(null)
+                    })
+                  }
+                }}
+              >
+                {t('home.chain.baseline')}
+              </Button>
+              <Button
+                disabled={busy || working || !data.canRestoreLastGood}
+                onClick={() => {
+                  void perform(restoreChainLastGood).then((ok) => {
+                    if (ok) {
+                      setDraft(null)
+                      setFrontId(null)
+                      setPreset(null)
+                      setExpected(null)
+                      setConsent(null)
+                      setAutomatic(null)
+                      setBackground(null)
+                      setReplaceAuthentication(false)
+                    }
+                  })
+                }}
+              >
+                {t('home.chain.restore')}
+              </Button>
+              <Button
+                disabled={busy}
+                onClick={() => {
+                  void perform(async () => {
+                    setDiagnostic(await previewChainDiagnostics())
+                  })
+                }}
+              >
+                {t('home.chain.diagnostics')}
+              </Button>
             </Box>
+            <Typography variant="caption" color="text.secondary">
+              {t('home.chain.switchNotice')}
+            </Typography>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={closeExisting}
+                  disabled={busy || !working}
+                  onChange={(_, value) => setCloseExisting(value)}
+                />
+              }
+              label={t('home.chain.closeExisting')}
+            />
             <Typography variant="caption" color="text.secondary">
               {t('home.chain.coverage')}
             </Typography>
           </Stack>
         </Paper>
       </Stack>
+      <Dialog
+        open={diagnostic !== null}
+        onClose={() => setDiagnostic(null)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>{t('home.chain.diagnostics')}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            {t('home.chain.diagnosticPrivacy')}
+          </Typography>
+          <Box component="pre" sx={{ overflow: 'auto', fontSize: 12 }}>
+            {diagnostic?.json}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDiagnostic(null)}>
+            {t('home.chain.close')}
+          </Button>
+          <Button
+            disabled={pending || !diagnostic}
+            onClick={() => {
+              void perform(async () => {
+                const path = await save({
+                  defaultPath: `ChainDesk-diagnostics-${Date.now()}.json`,
+                  filters: [{ name: 'JSON', extensions: ['json'] }],
+                })
+                if (path && diagnostic)
+                  await exportChainDiagnostics(path, diagnostic.sha256)
+              })
+            }}
+          >
+            {t('home.chain.exportDiagnostics')}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </BasePage>
   )
 }

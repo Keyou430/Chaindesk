@@ -206,8 +206,7 @@ fn start_embedded_server(listener: tokio::net::TcpListener, token: String) {
         let verge_config = Config::verge().await;
         let verge_data = verge_config.data_arc();
         let pac_content = verge_data.pac_file_content.as_deref().unwrap_or(DEFAULT_PAC);
-        // Port changes disable PAC, so the draft port avoids per-request Core queries.
-        let pac_port = MixedPort::desired().await;
+        let pac_port = MixedPort::effective().await;
         let processed_content = pac_content.replace("%mixed-port%", &format!("{pac_port}"));
         Ok::<_, warp::Rejection>(
             warp::http::Response::builder()

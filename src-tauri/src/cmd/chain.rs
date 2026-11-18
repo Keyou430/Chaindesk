@@ -1,5 +1,5 @@
 use super::{CmdResult, CommandFailure};
-use crate::config::chain::{ChainView, ConnectInput, ExitInput};
+use crate::config::chain::{ChainView, ConnectInput, DiagnosticPreview, ExitInput};
 
 #[cfg(windows)]
 fn report(error: anyhow::Error) -> CommandFailure {
@@ -89,4 +89,40 @@ pub(crate) async fn cancel_chain_connection() -> CmdResult {
     #[cfg(windows)]
     crate::feat::chain::cancel();
     Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn restore_chain_last_good() -> CmdResult<ChainView> {
+    portable!(crate::feat::chain::restore_last_good())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn confirm_chain_ipv4(ipv4: String) -> CmdResult<ChainView> {
+    portable!(crate::feat::chain::confirm_ipv4(ipv4))
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn preview_chain_diagnostics() -> CmdResult<DiagnosticPreview> {
+    portable!(crate::feat::chain_diagnostics::preview())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn export_chain_diagnostics(path: String, expected_sha256: String) -> CmdResult {
+    portable!(crate::feat::chain_diagnostics::export(path, expected_sha256))
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn keep_chain_current_proxy() -> CmdResult<ChainView> {
+    portable!(crate::feat::chain::keep_current_proxy())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn set_chain_background_checks(enabled: bool) -> CmdResult<ChainView> {
+    portable!(crate::feat::chain::set_background_checks(enabled))
 }

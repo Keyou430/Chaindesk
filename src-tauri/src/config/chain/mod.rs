@@ -3,7 +3,7 @@ pub(crate) mod download;
 pub(crate) mod importer;
 pub(crate) mod model;
 #[cfg(windows)]
-mod protection;
+pub(crate) mod protection;
 #[cfg(windows)]
 pub(crate) mod session;
 #[cfg(windows)]

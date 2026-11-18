@@ -26,6 +26,7 @@ import {
   verifyFile,
   verifySource,
 } from './baseline.mjs'
+import { createVmProbeFixture } from './vm-probe-fixture.mjs'
 import { createVmSubscriptionFixture } from './vm-subscription-fixture.mjs'
 import { prepareVmTlsFixture } from './vm-tls-fixture.mjs'
 
@@ -44,10 +45,12 @@ assert.ok(
 )
 const portable = values.milestone !== 'm0'
 const chainScenario = ['m2', 'm3', 'm4'].includes(values.milestone)
+const recoveryScenario = ['m3', 'm4'].includes(values.milestone)
 const portableHarnesses = [
   'accept-portable-vm.ps1',
   'vm-debugger.ps1',
   ...(chainScenario ? ['chain-vm-scenario.ps1'] : []),
+  ...(recoveryScenario ? ['recovery-vm-scenario.ps1'] : []),
 ]
 const reuseGuest = portable && values['base-evidence'] !== undefined
 const logPrefix = chainScenario
@@ -190,6 +193,9 @@ const nonce = randomBytes(24).toString('hex')
 const subscriptionFixture = chainScenario
   ? await createVmSubscriptionFixture(tlsFixtureDirectory, nonce)
   : undefined
+const probeFixture = recoveryScenario
+  ? await createVmProbeFixture(tlsFixtureDirectory)
+  : undefined
 let complete
 const completion = new Promise((resolve) => {
   complete = resolve
@@ -254,6 +260,22 @@ const server = http.createServer(async (request, response) => {
           requests: subscriptionFixture.requests,
         }),
       )
+    } else if (
+      recoveryScenario &&
+      resource === 'probe-fixture' &&
+      ['GET', 'POST'].includes(request.method)
+    ) {
+      if (request.method === 'POST') {
+        let body = ''
+        for await (const chunk of request) {
+          body += chunk
+          assert.ok(body.length <= 256)
+        }
+        probeFixture.setMode(JSON.parse(body).mode)
+      }
+      response
+        .writeHead(200, { 'Content-Type': 'application/json' })
+        .end(JSON.stringify(probeFixture.state))
     } else if (
       request.method === 'POST' &&
       portable &&
@@ -372,6 +394,11 @@ if (!reuseGuest) {
     await copyFile(
       path.join(projectRoot, 'scripts/chaindesk/chain-vm-scenario.ps1'),
       path.join(acceptanceDirectory, 'chain-vm-scenario.ps1'),
+    )
+  if (recoveryScenario)
+    await copyFile(
+      path.join(projectRoot, 'scripts/chaindesk/recovery-vm-scenario.ps1'),
+      path.join(acceptanceDirectory, 'recovery-vm-scenario.ps1'),
     )
   const guestHarness = `C:\\M0\\${portable ? 'M1\\' : ''}${harness}`
   await writeFile(
@@ -589,8 +616,8 @@ try {
         }),
       ),
     ])
-    if (result.finishedAt && guest.exitCode === null) {
-      await Promise.race([exited, delay(45000)])
+    if (result.finishedAt) {
+      if (guest.exitCode === null) await Promise.race([exited, delay(120000)])
       result.guestPoweredOff =
         guest.exitCode === 0 && shutdownReason === 'guest-shutdown'
       result.guestShutdownReason = shutdownReason
@@ -611,6 +638,7 @@ try {
     hostProxyModified: false,
     platformSecurityAcceptance: false,
     boots,
+    probeFixture: probeFixture?.state,
     guestResult: result,
   }
   await writeFile(
@@ -619,6 +647,12 @@ try {
   )
   console.log(JSON.stringify(hostEvidence))
   assert.equal(result.passed, true, result.error)
+  if (recoveryScenario)
+    assert.equal(
+      result.guestPoweredOff,
+      true,
+      'Verified guest shutdown is required for M3/M4 acceptance',
+    )
 } finally {
   clearInterval(capture)
   if (guest?.exitCode === null) {
@@ -634,5 +668,6 @@ try {
   qmpServer.close()
   server.close()
   subscriptionFixture?.close()
+  probeFixture?.close()
   log.end()
 }

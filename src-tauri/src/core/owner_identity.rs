@@ -93,6 +93,16 @@ pub(crate) fn current_user_pipe_sddl() -> Result<String> {
 }
 
 #[cfg(windows)]
+pub(crate) fn process_sid(process: windows_sys::Win32::Foundation::HANDLE) -> Result<String> {
+    windows_owner::process_sid(process)
+}
+
+#[cfg(windows)]
+pub(crate) fn create_private_pipe(name: &str) -> Result<tokio::net::windows::named_pipe::NamedPipeServer> {
+    windows_owner::create_pipe(name)
+}
+
+#[cfg(windows)]
 mod windows_owner {
     use anyhow::{Context as _, Result, bail};
     use clash_verge_logging::{Type, logging};
@@ -135,8 +145,12 @@ mod windows_owner {
     ];
 
     pub(super) fn current_sid() -> Result<String> {
+        process_sid(unsafe { GetCurrentProcess() })
+    }
+
+    pub(super) fn process_sid(process: windows_sys::Win32::Foundation::HANDLE) -> Result<String> {
         let mut token = std::ptr::null_mut();
-        if unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) } == 0 {
+        if unsafe { OpenProcessToken(process, TOKEN_QUERY, &mut token) } == 0 {
             return Err(std::io::Error::last_os_error()).context("failed to open process token");
         }
         let token = OwnedHandle(token);
@@ -216,6 +230,25 @@ mod windows_owner {
         let sid = current_sid()?;
         let descriptor = LocalSecurityDescriptor::from_sid(&sid)?;
         create_file(path, &descriptor)
+    }
+
+    pub(super) fn create_pipe(name: &str) -> Result<tokio::net::windows::named_pipe::NamedPipeServer> {
+        let descriptor = LocalSecurityDescriptor::from_sid(&current_sid()?)?;
+        let mut attributes = SECURITY_ATTRIBUTES {
+            nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
+            lpSecurityDescriptor: descriptor.0,
+            bInheritHandle: 0,
+        };
+        let server = unsafe {
+            tokio::net::windows::named_pipe::ServerOptions::new()
+                .first_pipe_instance(true)
+                .max_instances(1)
+                .reject_remote_clients(true)
+                .in_buffer_size(65536)
+                .out_buffer_size(65536)
+                .create_with_security_attributes_raw(name, (&mut attributes as *mut SECURITY_ATTRIBUTES).cast())
+        }?;
+        Ok(server)
     }
 
     pub(super) fn create_private_directory(path: &Path) -> Result<()> {

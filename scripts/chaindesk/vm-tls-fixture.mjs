@@ -33,37 +33,49 @@ export async function prepareVmTlsFixture(directory) {
     '-addext',
     'keyUsage=critical,keyCertSign,cRLSign',
   ])
-  run([
-    'req',
-    '-newkey',
-    'rsa:2048',
-    '-nodes',
-    '-keyout',
-    'server.key',
-    '-out',
-    'server.csr',
-    '-subj',
-    '/CN=front.fixture.test',
-  ])
-  await writeFile(
-    path.join(directory, 'leaf.ext'),
-    'basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectAltName=DNS:front.fixture.test,IP:127.0.0.1,IP:10.0.2.2\n',
+  const leaf = async (name, commonName, alternatives) => {
+    run([
+      'req',
+      '-newkey',
+      'rsa:2048',
+      '-nodes',
+      '-keyout',
+      `${name}.key`,
+      '-out',
+      `${name}.csr`,
+      '-subj',
+      `/CN=${commonName}`,
+    ])
+    await writeFile(
+      path.join(directory, `${name}.ext`),
+      `basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectAltName=${alternatives}\n`,
+    )
+    run([
+      'x509',
+      '-req',
+      '-in',
+      `${name}.csr`,
+      '-CA',
+      'ca.pem',
+      '-CAkey',
+      'ca.key',
+      '-CAcreateserial',
+      '-out',
+      `${name}.pem`,
+      '-days',
+      '2',
+      '-extfile',
+      `${name}.ext`,
+    ])
+  }
+  await leaf(
+    'server',
+    'front.fixture.test',
+    'DNS:front.fixture.test,IP:127.0.0.1,IP:10.0.2.2',
   )
-  run([
-    'x509',
-    '-req',
-    '-in',
-    'server.csr',
-    '-CA',
-    'ca.pem',
-    '-CAkey',
-    'ca.key',
-    '-CAcreateserial',
-    '-out',
-    'server.pem',
-    '-days',
-    '2',
-    '-extfile',
-    'leaf.ext',
-  ])
+  await leaf(
+    'probe',
+    'ChainDesk_VM_probe_fixture_only',
+    'DNS:www.gstatic.com,DNS:cp.cloudflare.com,DNS:api.ipify.org,DNS:www.cloudflare.com',
+  )
 }

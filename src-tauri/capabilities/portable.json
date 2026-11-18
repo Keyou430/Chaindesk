@@ -51,18 +51,6 @@
     "clipboard-manager:allow-write-text",
     "dialog:default",
     "notification:default",
-    "http:default",
-    {
-      "identifier": "http:default",
-      "allow": [
-        {
-          "url": "https://*/*"
-        },
-        {
-          "url": "http://*/*"
-        }
-      ]
-    },
     "mihomo:allow-get-version",
     "mihomo:allow-flush-fakeip",
     "mihomo:allow-flush-dns",
@@ -71,20 +59,12 @@
     "mihomo:allow-close-connection",
     "mihomo:allow-get-groups",
     "mihomo:allow-get-group-by-name",
-    "mihomo:allow-delay-group",
     "mihomo:allow-get-proxy-providers",
     "mihomo:allow-get-proxy-provider-by-name",
-    "mihomo:allow-update-proxy-provider",
-    "mihomo:allow-healthcheck-proxy-provider",
-    "mihomo:allow-healthcheck-node-in-provider",
     "mihomo:allow-get-proxies",
     "mihomo:allow-get-proxy-by-name",
-    "mihomo:allow-select-node-for-group",
-    "mihomo:allow-unfixed-proxy",
-    "mihomo:allow-delay-proxy-by-name",
     "mihomo:allow-get-rules",
     "mihomo:allow-get-rule-providers",
-    "mihomo:allow-update-rule-provider",
     "mihomo:allow-get-base-config",
     "mihomo:allow-ws-traffic",
     "mihomo:allow-ws-memory",

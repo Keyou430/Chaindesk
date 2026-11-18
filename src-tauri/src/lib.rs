@@ -191,6 +191,10 @@ fn handle_singleton_startup(
 }
 
 pub fn run() -> std::process::ExitCode {
+    #[cfg(windows)]
+    if let Some(result) = core::proxy_watchdog::entrypoint() {
+        return result;
+    }
     #[cfg(all(target_os = "macos", not(debug_assertions), not(test), not(feature = "verge-dev")))]
     if utils::macos_launch_guard::enforce_before_initialization() == utils::macos_launch_guard::LaunchDisposition::Exit
     {
@@ -225,6 +229,20 @@ pub fn run() -> std::process::ExitCode {
         StartupAction::Continue => {}
         StartupAction::ExitSuccess => return std::process::ExitCode::SUCCESS,
         StartupAction::ExitFailure => return std::process::ExitCode::FAILURE,
+    }
+
+    #[cfg(windows)]
+    if let Err(error) = core::portable_proxy::recover_orphaned()
+        && !core::portable_proxy::has_conflict()
+    {
+        utils::startup::report_error(&error);
+        return std::process::ExitCode::FAILURE;
+    }
+
+    #[cfg(windows)]
+    if let Err(error) = core::portable::cleanup_orphaned_runtime() {
+        utils::startup::report_error(&error);
+        return std::process::ExitCode::FAILURE;
     }
 
     #[cfg(windows)]

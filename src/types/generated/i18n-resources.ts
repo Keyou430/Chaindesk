@@ -41,29 +41,43 @@ export interface TranslationResources {
       chain: {
         allProxy: string
         authentication: string
+        automatic: string
         background: string
+        backgroundDetail: string
+        baseline: string
         cancel: string
+        candidateObservation: string
         capability: string
         chinaDirect: string
         choose: string
+        close: string
+        closeExisting: string
         connect: string
         consent: string
         coverage: string
+        currentFront: string
+        diagnosticPrivacy: string
+        diagnostics: string
         disconnect: string
         empty: string
         exclude: string
         exit: string
+        expected: string
+        exportDiagnostics: string
         forget: string
         front: string
         host: string
         importFile: string
         importUrl: string
         include: string
+        keepCurrent: string
+        lastHealthCheck: string
         loading: string
         localProxy: string
         notObserved: string
         observed: string
         password: string
+        pendingFront: string
         phases: {
           connected: string
           connecting: string
@@ -78,11 +92,14 @@ export interface TranslationResources {
         port: string
         privacy: string
         remember: string
+        restore: string
         reuse: string
         rules: string
         saved: string
         settings: string
         subscription: string
+        switch: string
+        switchNotice: string
         title: string
         update: string
         url: string

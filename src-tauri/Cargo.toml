@@ -42,7 +42,6 @@ tauri-plugin-clipboard-manager = { workspace = true }
 tauri = { workspace = true, features = [
   "protocol-asset",
   "devtools",
-  "tracing",
   "tray-icon",
   "image-ico",
   "image-png",

@@ -302,6 +302,12 @@ impl CoreManager {
             }
         };
 
+        #[cfg(windows)]
+        if let Err(error) = crate::core::portable::record_child(crate::core::portable::controller()?, child.pid()) {
+            let _ = child.kill();
+            return Err(error);
+        }
+
         #[cfg(unix)]
         unsafe {
             tauri_plugin_clash_verge_sysinfo::libc::umask(previous_mask)
@@ -328,6 +334,12 @@ impl CoreManager {
                         if crate::core::portable::is_port_conflict(&message) {
                             observed_conflict.store(true, std::sync::atomic::Ordering::Release);
                         }
+                        #[cfg(windows)]
+                        let message = if crate::core::portable::is_port_conflict(&message) {
+                            String::from("{\"event\":\"CORE_LISTENER_CONFLICT\"}")
+                        } else {
+                            String::from("{\"event\":\"CORE_OUTPUT_WITHHELD\"}")
+                        };
                         Logger::global().writer_sidecar_log(Level::Error, &message);
                         CLASH_LOGGER.append_log(message);
                     }
@@ -354,31 +366,46 @@ impl CoreManager {
 
         #[cfg(windows)]
         let mixed_port = crate::config::MixedPort::desired().await;
-        let readiness = poll_sidecar_readiness(SIDECAR_READINESS_ATTEMPTS, SIDECAR_READINESS_INTERVAL, || async {
-            tokio::time::timeout(SIDECAR_READINESS_PROBE_TIMEOUT, async {
-                handle::Handle::mihomo().get_version().await
-            })
-            .await
-            .context("Mihomo readiness probe timed out")??;
-            #[cfg(windows)]
-            {
-                let owner = AsyncHandler::spawn_blocking(move || {
-                    crate::core::listener::loopback_tcp_listener_owner(mixed_port)
+        let readiness = async {
+            poll_sidecar_readiness(SIDECAR_READINESS_ATTEMPTS, SIDECAR_READINESS_INTERVAL, || async {
+                tokio::time::timeout(SIDECAR_READINESS_PROBE_TIMEOUT, async {
+                    handle::Handle::mihomo().get_version().await
                 })
                 .await
-                .context("proxy listener ownership query did not finish")??;
-                match owner {
-                    Some(owner) if owner == pid => {}
-                    Some(_) => return Err(crate::core::portable::PortConflict.into()),
-                    None => anyhow::bail!("the owned core has not opened its loopback proxy listener"),
+                .context("Mihomo readiness probe timed out")??;
+                #[cfg(windows)]
+                {
+                    let owner = AsyncHandler::spawn_blocking(move || {
+                        crate::core::listener::loopback_tcp_listener_owner(mixed_port)
+                    })
+                    .await
+                    .context("proxy listener ownership query did not finish")??;
+                    match owner {
+                        Some(owner) if owner == pid => {}
+                        Some(_) => return Err(crate::core::portable::PortConflict.into()),
+                        None => anyhow::bail!("the owned core has not opened its loopback proxy listener"),
+                    }
+                    if port_conflict.load(std::sync::atomic::Ordering::Acquire) {
+                        return Err(crate::core::portable::PortConflict.into());
+                    }
                 }
-                if port_conflict.load(std::sync::atomic::Ordering::Acquire) {
-                    return Err(crate::core::portable::PortConflict.into());
-                }
-            }
-            Ok(())
-        })
-        .await;
+                Ok(())
+            })
+            .await?;
+            // The listeners and version API precede inbound Running; a completed reload is the barrier.
+            #[cfg(windows)]
+            handle::Handle::mihomo()
+                .reload_config(true, dirs::path_to_str(&config_file)?)
+                .await?;
+            Ok::<(), anyhow::Error>(())
+        };
+        #[cfg(windows)]
+        let readiness = tokio::time::timeout(std::time::Duration::from_secs(15), readiness)
+            .await
+            .context("The working core did not finish its configuration readiness barrier")
+            .and_then(|result| result);
+        #[cfg(not(windows))]
+        let readiness = readiness.await;
         if let Err(readiness_error) = readiness {
             #[cfg(windows)]
             let readiness_error = if port_conflict.load(std::sync::atomic::Ordering::Acquire) {
@@ -500,6 +527,11 @@ impl CoreManager {
         self.core_stopped();
         #[cfg(target_os = "macos")]
         crate::utils::resolve::dns::sync_public_dns().await;
+        #[cfg(windows)]
+        {
+            drop(_life);
+            crate::feat::chain::working_core_terminated();
+        }
     }
 }
 
@@ -706,7 +738,7 @@ mod readiness_tests {
 }
 
 #[cfg(target_os = "windows")]
-fn create_and_assign_sidecar_job(child_pid: u32) -> Result<OwnedHandle> {
+pub(crate) fn create_and_assign_sidecar_job(child_pid: u32) -> Result<OwnedHandle> {
     unsafe {
         let raw_job: HANDLE = CreateJobObjectW(std::ptr::null(), std::ptr::null());
         if raw_job.is_null() {

@@ -62,6 +62,16 @@ for (const asset of baseline.artifacts.rules.assets) {
   await copyFile(source, path.join(product, 'resources/rules', asset.name))
 }
 await copyFile(path.join(projectRoot, 'LICENSE'), path.join(product, 'LICENSE'))
+if (['m3', 'm4'].includes(values.milestone)) {
+  const recovery = await readFile(
+    path.join(projectRoot, 'scripts/chaindesk/recover-proxy.cmd'),
+    'utf8',
+  )
+  await writeFile(
+    path.join(product, 'Recover proxy.cmd'),
+    recovery.replace(/\r?\n/g, '\r\n'),
+  )
+}
 if (values.full) {
   const runtime = path.join(
     cache,

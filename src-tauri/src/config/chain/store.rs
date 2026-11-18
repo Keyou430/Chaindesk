@@ -30,13 +30,17 @@ pub(crate) struct Settings {
     pub expected_ipv4: Option<String>,
     pub probe_consent: bool,
     pub background_checks: bool,
+    #[serde(default)]
+    pub automatic_front: bool,
     pub excluded_front_ids: Vec<String>,
+    #[serde(default)]
+    pub last_good: Option<GoodInputs>,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            schema_version: 1,
+            schema_version: 2,
             credential_revision: String::new(),
             endpoint: None,
             remember_authentication: false,
@@ -46,7 +50,9 @@ impl Default for Settings {
             expected_ipv4: None,
             probe_consent: false,
             background_checks: true,
+            automatic_front: false,
             excluded_front_ids: Vec::new(),
+            last_good: None,
         }
     }
 }
@@ -57,12 +63,35 @@ pub(crate) struct Secrets {
     pub authentication: Option<ExitAuthentication>,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct GoodInputs {
+    pub credential_revision: String,
+    pub endpoint: ExitEndpoint,
+    pub front_id: String,
+    pub preset: RulePreset,
+    pub expected_ipv4: Option<String>,
+    pub authentication_required: bool,
+    pub remember_authentication: bool,
+    pub background_checks: bool,
+    #[serde(default)]
+    pub automatic_front: bool,
+}
+
+#[derive(Clone)]
+pub(crate) struct GoodData {
+    pub inputs: GoodInputs,
+    pub secrets: Secrets,
+    pub session_authentication: Option<ExitAuthentication>,
+}
+
 #[derive(Clone, Default)]
 pub(crate) struct ChainData {
     pub settings: Settings,
     pub secrets: Secrets,
     pub session_authentication: Option<ExitAuthentication>,
     pub cleanup_pending: bool,
+    pub last_good: Option<GoodData>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -111,7 +140,7 @@ fn load_at(root: &std::path::Path) -> Result<ChainData> {
                 "Saved settings cannot be read. Keep a copy of the data directory before recovery.",
             )
         })?;
-    if settings.schema_version != 1 {
+    if !matches!(settings.schema_version, 1 | 2) {
         return Err(failure(
             "RECOVERY_REQUIRED",
             "This settings version requires a compatible application version.",
@@ -138,13 +167,31 @@ fn load_at(root: &std::path::Path) -> Result<ChainData> {
     if scrub_unremembered_authentication(&mut records, &settings) {
         write_records(root, &records).map_err(|_| cleanup_failure())?;
     }
-    let mut secrets = records.swap_remove(desired).secrets;
-    if let Some(cached) = secrets.subscription.take() {
-        let imported_at = cached.imported_at;
-        let mut subscription = importer::parse(cached.source, cached.name, cached.update_url)?;
-        subscription.imported_at = imported_at;
-        secrets.subscription = Some(subscription);
-    }
+    let mut secrets = records[desired].secrets.clone();
+    parse_cached(&mut secrets)?;
+    let last_good = settings
+        .last_good
+        .as_ref()
+        .map(|inputs| {
+            let mut secrets = records
+                .iter()
+                .find(|record| record.revision == inputs.credential_revision)
+                .ok_or_else(|| failure("RECOVERY_REQUIRED", "The last working credential revision is missing."))?
+                .secrets
+                .clone();
+            parse_cached(&mut secrets)?;
+            let session_authentication = if inputs.authentication_required {
+                secrets.authentication.clone()
+            } else {
+                Some(ExitAuthentication::default())
+            };
+            Ok::<_, anyhow::Error>(GoodData {
+                inputs: inputs.clone(),
+                secrets,
+                session_authentication,
+            })
+        })
+        .transpose()?;
     let session_authentication = if settings.authentication_required {
         secrets.authentication.clone()
     } else {
@@ -155,14 +202,64 @@ fn load_at(root: &std::path::Path) -> Result<ChainData> {
         secrets,
         session_authentication,
         cleanup_pending: false,
+        last_good,
     })
 }
 
-pub(crate) async fn commit(mut next: ChainData) -> Result<Arc<ChainData>> {
+fn parse_cached(secrets: &mut Secrets) -> Result<()> {
+    if let Some(cached) = secrets.subscription.take() {
+        let imported_at = cached.imported_at;
+        let mut subscription = importer::parse(cached.source, cached.name, cached.update_url)?;
+        subscription.imported_at = imported_at;
+        secrets.subscription = Some(subscription);
+    }
+    Ok(())
+}
+
+pub(crate) async fn commit(next: ChainData) -> Result<Arc<ChainData>> {
+    commit_revision(next, false).await
+}
+
+pub(crate) async fn commit_good(next: ChainData) -> Result<Arc<ChainData>> {
+    commit_revision(next, true).await
+}
+
+async fn commit_revision(mut next: ChainData, good: bool) -> Result<Arc<ChainData>> {
     let previous = snapshot().await?;
+    next.settings.schema_version = 2;
     next.settings.credential_revision = random_token()?;
     if !next.settings.remember_authentication || !next.settings.authentication_required {
         next.secrets.authentication = None;
+        if let Some(last) = next.last_good.as_mut() {
+            last.secrets.authentication = None;
+        }
+    }
+    if good {
+        let inputs = GoodInputs {
+            credential_revision: next.settings.credential_revision.clone(),
+            endpoint: next
+                .settings
+                .endpoint
+                .clone()
+                .ok_or_else(|| failure("EXIT_ADDRESS_INVALID", "The working exit is missing."))?,
+            front_id: next
+                .settings
+                .selected_front_id
+                .clone()
+                .ok_or_else(|| failure("NO_VALID_FRONT", "The working front is missing."))?,
+            preset: next.settings.preset,
+            expected_ipv4: next.settings.expected_ipv4.clone(),
+            authentication_required: next.settings.authentication_required,
+            remember_authentication: next.settings.remember_authentication,
+            background_checks: next.settings.background_checks,
+            automatic_front: next.settings.automatic_front,
+        };
+        next.last_good = Some(GoodData {
+            inputs: inputs.clone(),
+            secrets: next.secrets.clone(),
+            session_authentication: next.session_authentication.clone(),
+        });
+        next.settings.last_good = Some(inputs);
     }
     let current = next.clone();
     let outcome = crate::AsyncHandler::spawn_blocking(move || save(&previous, &current)).await??;
@@ -181,6 +278,20 @@ fn save(previous: &ChainData, next: &ChainData) -> Result<SaveOutcome> {
 }
 
 fn save_at(root: &std::path::Path, previous: &ChainData, next: &ChainData) -> Result<SaveOutcome> {
+    if previous.settings.schema_version == 1 && !previous.settings.credential_revision.is_empty() {
+        let backup = root.join("backups/schema-1-migration.bin");
+        if !backup.exists() {
+            crate::core::owner_identity::create_private_current_user_directory(&root.join("backups"))?;
+            let mut secrets = previous.secrets.clone();
+            secrets.authentication = None;
+            let mut settings = previous.settings.clone();
+            settings.remember_authentication = false;
+            help::save_private_bytes(
+                &backup,
+                &protection::protect(&serde_json::to_vec(&(settings, secrets))?)?,
+            )?;
+        }
+    }
     let mut records = Vec::new();
     if !previous.settings.credential_revision.is_empty() {
         records.push(CredentialRecord {
@@ -192,13 +303,64 @@ fn save_at(root: &std::path::Path, previous: &ChainData, next: &ChainData) -> Re
         revision: next.settings.credential_revision.clone(),
         secrets: next.secrets.clone(),
     });
+    if let Some(last) = next.last_good.as_ref()
+        && !records
+            .iter()
+            .any(|record| record.revision == last.inputs.credential_revision)
+    {
+        records.push(CredentialRecord {
+            revision: last.inputs.credential_revision.clone(),
+            secrets: last.secrets.clone(),
+        });
+    }
+    if let Some(last) = previous.last_good.as_ref()
+        && !records
+            .iter()
+            .any(|record| record.revision == last.inputs.credential_revision)
+    {
+        records.push(CredentialRecord {
+            revision: last.inputs.credential_revision.clone(),
+            secrets: last.secrets.clone(),
+        });
+    }
     // The previous revision stays complete until the settings pointer commits.
     write_records(root, &records)?;
     help::save_private_bytes(&root.join("settings.json"), &serde_json::to_vec_pretty(&next.settings)?)?;
-    if scrub_unremembered_authentication(&mut records, &next.settings) && write_records(root, &records).is_err() {
+    scrub_unremembered_authentication(&mut records, &next.settings);
+    records.retain(|record| {
+        record.revision == next.settings.credential_revision
+            || next
+                .settings
+                .last_good
+                .as_ref()
+                .is_some_and(|last| last.credential_revision == record.revision)
+    });
+    if write_records(root, &records).is_err() {
         return Ok(SaveOutcome::CleanupPending);
     }
     Ok(SaveOutcome::Complete)
+}
+
+pub(crate) fn restored(current: &ChainData) -> Result<ChainData> {
+    let last = current
+        .last_good
+        .as_ref()
+        .ok_or_else(|| failure("RECOVERY_REQUIRED", "No last working configuration is available."))?;
+    let mut next = current.clone();
+    next.settings.endpoint = Some(last.inputs.endpoint.clone());
+    next.settings.selected_front_id = Some(last.inputs.front_id.clone());
+    next.settings.preset = last.inputs.preset;
+    next.settings.expected_ipv4 = last.inputs.expected_ipv4.clone();
+    next.settings.authentication_required = last.inputs.authentication_required;
+    next.settings.remember_authentication =
+        last.inputs.remember_authentication && last.secrets.authentication.is_some();
+    next.settings.background_checks = last.inputs.background_checks;
+    next.settings.automatic_front = last.inputs.automatic_front;
+    next.settings.probe_consent = false;
+    next.settings.excluded_front_ids.clear();
+    next.secrets = last.secrets.clone();
+    next.session_authentication = last.session_authentication.clone();
+    Ok(next)
 }
 
 fn scrub_unremembered_authentication(records: &mut [CredentialRecord], settings: &Settings) -> bool {
@@ -229,6 +391,96 @@ mod tests {
         core::owner_identity::create_private_current_user_directory,
         utils::{help, server::random_token},
     };
+
+    #[test]
+    fn a_failed_good_revision_commit_retains_the_old_good_inputs_and_secret() -> anyhow::Result<()> {
+        let root = std::env::temp_dir()
+            .canonicalize()?
+            .join(format!("chaindesk-good-{}", random_token()?));
+        create_private_current_user_directory(&root)?;
+        let root = scopeguard::guard(root, |root| {
+            let _ = std::fs::remove_dir_all(root);
+        });
+        let mut good = ChainData::default();
+        good.settings.credential_revision = "good".into();
+        good.settings.remember_authentication = true;
+        good.settings.authentication_required = true;
+        good.secrets.authentication = Some(ExitAuthentication {
+            username: "fixture".into(),
+            password: "last-good-sentinel".into(),
+        });
+        let inputs = super::GoodInputs {
+            credential_revision: "good".into(),
+            endpoint: super::ExitEndpoint {
+                host: "exit.example".into(),
+                port: 1080,
+            },
+            front_id: "front".into(),
+            preset: super::RulePreset::AllProxy,
+            expected_ipv4: Some("203.0.113.1".into()),
+            authentication_required: true,
+            remember_authentication: true,
+            background_checks: false,
+            automatic_front: false,
+        };
+        good.settings.last_good = Some(inputs.clone());
+        good.last_good = Some(super::GoodData {
+            inputs,
+            secrets: good.secrets.clone(),
+            session_authentication: good.secrets.authentication.clone(),
+        });
+        save_at(&root, &ChainData::default(), &good)?;
+        let mut desired = good.clone();
+        desired.settings.credential_revision = "desired".into();
+        desired.secrets.authentication = Some(ExitAuthentication {
+            username: "fixture".into(),
+            password: "unverified-desired-sentinel".into(),
+        });
+        save_at(&root, &good, &desired)?;
+        let mut candidate = desired.clone();
+        candidate.settings.credential_revision = "candidate".into();
+        let mut inputs = candidate
+            .settings
+            .last_good
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("missing fixture good inputs"))?;
+        inputs.credential_revision = "candidate".into();
+        candidate.settings.last_good = Some(inputs.clone());
+        candidate.last_good = Some(super::GoodData {
+            inputs,
+            secrets: candidate.secrets.clone(),
+            session_authentication: candidate.secrets.authentication.clone(),
+        });
+        let settings = root.join("settings.json");
+        let permissions = settings.metadata()?.permissions();
+        let restore = scopeguard::guard((settings.clone(), permissions.clone()), |(path, permissions)| {
+            let _ = std::fs::set_permissions(path, permissions);
+        });
+        let mut readonly = permissions.clone();
+        readonly.set_readonly(true);
+        std::fs::set_permissions(&settings, readonly)?;
+        assert!(save_at(&root, &desired, &candidate).is_err());
+        let reloaded = load_at(&root)?;
+        assert_eq!(reloaded.settings.credential_revision, "desired");
+        let restored = super::restored(&reloaded)?;
+        assert_eq!(
+            restored
+                .secrets
+                .authentication
+                .as_ref()
+                .map(|auth| auth.password.as_str()),
+            Some("last-good-sentinel")
+        );
+        assert_eq!(restored.settings.expected_ipv4.as_deref(), Some("203.0.113.1"));
+        assert!(!restored.settings.probe_consent);
+        std::fs::set_permissions(&settings, permissions)?;
+        drop(restore);
+        candidate.settings.remember_authentication = false;
+        candidate.secrets.authentication = None;
+        save_at(&root, &desired, &candidate)?;
+        assert!(super::restored(&load_at(&root)?)?.session_authentication.is_none());
+        Ok(())
+    }
 
     #[test]
     fn failed_settings_replace_keeps_the_previous_secret_and_forgetting_removes_it() -> anyhow::Result<()> {

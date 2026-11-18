@@ -443,6 +443,12 @@ impl IVerge {
         self.proxy_host = Some("127.0.0.1".into());
         self.clash_core = Some("verge-mihomo".into());
         self.startup_script = None;
+        self.enable_auto_backup_schedule = Some(false);
+        self.auto_backup_on_change = Some(false);
+        self.enable_global_hotkey = Some(false);
+        self.pac_file_content = Some(DEFAULT_PAC.into());
+        self.system_proxy_bypass = None;
+        self.use_default_bypass = Some(true);
     }
 
     #[allow(clippy::cognitive_complexity)]

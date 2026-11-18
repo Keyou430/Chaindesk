@@ -211,6 +211,10 @@ impl Logger {
                 .map(|loc| format!("{}:{}", loc.file(), loc.line()))
                 .unwrap_or_else(|| "Unknown location".to_string());
             logging!(error, Type::System, "Panic occurred at {}: {}", location, payload);
+            let backtrace = std::backtrace::Backtrace::capture();
+            if backtrace.status() == std::backtrace::BacktraceStatus::Captured {
+                logging!(error, Type::System, "{}", backtrace);
+            }
             Self::global().flush_logs();
             std::thread::sleep(Duration::from_millis(100));
         }));

@@ -6,6 +6,27 @@ pub(crate) const FRONT_GROUP: &str = "CHAIN_DESK_FRONT";
 pub(crate) const EXIT_GROUP: &str = "CHAIN_DESK_EXIT";
 pub(crate) const EXIT_NODE: &str = "CHAIN_DESK_FIXED_EXIT";
 
+pub(crate) fn front_probe(mut chain: Mapping) -> Mapping {
+    if let Some(proxies) = chain.get_mut("proxies").and_then(Value::as_sequence_mut) {
+        proxies.retain(|node| node["name"].as_str() != Some(EXIT_NODE));
+    }
+    if let Some(groups) = chain.get_mut("proxy-groups").and_then(Value::as_sequence_mut) {
+        groups.retain(|group| group["name"].as_str() == Some(FRONT_GROUP));
+    }
+    chain.insert(
+        "rules".into(),
+        Value::Sequence(vec![format!("MATCH,{FRONT_GROUP}").into()]),
+    );
+    if let Some(dns) = chain.get_mut("dns").and_then(Value::as_mapping_mut) {
+        dns.remove("nameserver-policy");
+        dns.insert(
+            "nameserver".into(),
+            Value::Sequence(vec![format!("https://1.1.1.1/dns-query#{FRONT_GROUP}").into()]),
+        );
+    }
+    chain
+}
+
 pub(crate) fn blocked(mixed_port: u16) -> Mapping {
     Mapping::from_iter([
         ("mixed-port".into(), mixed_port.into()),
@@ -150,6 +171,14 @@ pub(crate) fn build(
 mod tests {
     use super::{EXIT_NODE, ExitAuthentication, ExitEndpoint, RulePreset, Value, build};
     use crate::config::chain::importer;
+
+    #[cfg(windows)]
+    #[test]
+    fn portable_pac_never_offers_direct_as_a_proxy_failure_fallback() {
+        let pac = crate::config::DEFAULT_PAC;
+        assert!(pac.contains("PROXY 127.0.0.1:%mixed-port%"));
+        assert!(!pac.contains("DIRECT"));
+    }
 
     #[test]
     fn fixes_the_exit_without_direct_fallback_or_source_configuration_inheritance() -> anyhow::Result<()> {

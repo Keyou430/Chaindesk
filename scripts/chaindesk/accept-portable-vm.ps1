@@ -36,21 +36,30 @@ function Connect-Application([Diagnostics.Process]$Process, [int]$Port) {
     $debugger = $null
     do {
         if ($Process.HasExited) { throw "Application exited during startup: $($Process.ExitCode)" }
-        if (-not $debugger) {
-            try { $pages = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/json/list" -TimeoutSec 2 } catch { $pages = @() }
-            $page = $pages | Where-Object { $_.type -eq 'page' -and $_.webSocketDebuggerUrl } | Select-Object -First 1
-            if ($page) {
-                $debugger = [Net.WebSockets.ClientWebSocket]::new()
-                $timeout = [Threading.CancellationTokenSource]::new(10000)
-                try { [void]$debugger.ConnectAsync([Uri]$page.webSocketDebuggerUrl, $timeout.Token).GetAwaiter().GetResult() } finally { $timeout.Dispose() }
+        try {
+            if (-not $debugger) {
+                try { $pages = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/json/list" -TimeoutSec 2 } catch { $pages = @() }
+                $page = $pages | Where-Object { $_.type -eq 'page' -and $_.webSocketDebuggerUrl } | Select-Object -First 1
+                if ($page) {
+                    $debugger = [Net.WebSockets.ClientWebSocket]::new()
+                    $timeout = [Threading.CancellationTokenSource]::new([int][Math]::Max(1, [Math]::Min(10000, ($deadline - [DateTime]::UtcNow).TotalMilliseconds)))
+                    try { [void]$debugger.ConnectAsync([Uri]$page.webSocketDebuggerUrl, $timeout.Token).GetAwaiter().GetResult() } finally { $timeout.Dispose() }
+                }
             }
-        }
-        if ($debugger) {
-            $ready = Invoke-DebuggerExpression "typeof window.__TAURI_INTERNALS__?.invoke === 'function' && (document.getElementById('root')?.childElementCount ?? 0) > 0" $debugger
-            if ($ready) {
-                $state = Invoke-DebuggerExpression "window.__TAURI_INTERNALS__.invoke('get_runtime_state')" $debugger
-                if ($state.mode -eq 'Sidecar') { return $debugger }
+            if ($debugger) {
+                $remaining = [int][Math]::Max(1, [Math]::Min(15000, ($deadline - [DateTime]::UtcNow).TotalMilliseconds))
+                $ready = Invoke-DebuggerExpression "typeof window.__TAURI_INTERNALS__?.invoke === 'function' && (document.getElementById('root')?.childElementCount ?? 0) > 0" $debugger $remaining
+                if ($ready) {
+                    $remaining = [int][Math]::Max(1, [Math]::Min(15000, ($deadline - [DateTime]::UtcNow).TotalMilliseconds))
+                    $state = Invoke-DebuggerExpression "window.__TAURI_INTERNALS__.invoke('get_runtime_state')" $debugger $remaining
+                    if ($state.mode -eq 'Sidecar') { return $debugger }
+                }
             }
+        } catch {
+            $cause = $_.Exception.GetBaseException()
+            $closed = $debugger -and $debugger.State -in @([Net.WebSockets.WebSocketState]::Closed, [Net.WebSockets.WebSocketState]::CloseReceived, [Net.WebSockets.WebSocketState]::Aborted)
+            if ($cause -isnot [OperationCanceledException] -and $cause -isnot [Net.WebSockets.WebSocketException] -and -not $closed) { throw }
+            if ($debugger) { $debugger.Dispose(); $debugger = $null }
         }
         Start-Sleep -Milliseconds 500
     } until ([DateTime]::UtcNow -gt $deadline)
@@ -104,6 +113,7 @@ function Stop-Application([Diagnostics.Process]$Process, [Net.WebSockets.ClientW
 }
 
 function Start-Product([string]$Root) {
+    $env:RUST_BACKTRACE = '1'
     $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=9223'
     $env:WEBVIEW2_BROWSER_EXECUTABLE_FOLDER = 'C:\M0\nonexistent-inherited-runtime'
     $env:WEBVIEW2_USER_DATA_FOLDER = 'C:\M0\forbidden-inherited-browser-data'
@@ -395,6 +405,74 @@ try {
 } catch {
     $result.error = $_.Exception.Message
     $result.scriptStack = $_.ScriptStackTrace
+    if ($Milestone -ne 'm1' -and $socket -and $socket.State -eq [Net.WebSockets.WebSocketState]::Open) {
+        try {
+            $chainState = Invoke-DebuggerExpression "window.__TAURI_INTERNALS__.invoke('get_chain_state')" $socket 5000
+            $result.chainFailure = @{ phase = [string]$chainState.phase; errorCode = [string]$chainState.error.code; message = [string]$chainState.error.message; observation = $chainState.observation; candidateObservation = $chainState.candidateObservation }
+        } catch { $result.chainInspectionError = [string]$_.Exception.Message }
+    }
+    if ($Milestone -in @('m3', 'm4') -and $result.chainFailure.errorCode -eq 'CHAIN_PROBE_FAILED' -and $nodes -and $frontFixture -and $exitFixture -and -not $frontFixture.process.HasExited -and -not $exitFixture.process.HasExited) {
+        try {
+            $candidateName = if ($result.scriptStack -like '*recovery-vm-scenario*' -and $alternate) { $alternate.name } else { $profile.name }
+            $referenceFront = ($nodes | Where-Object name -eq $candidateName | Select-Object -First 1).Clone()
+            $referenceFront.name = 'standalone-front'
+            $referencePort = Get-FixturePort
+            $referenceCore = Start-FixtureCore 'standalone-probe' @{ 'mixed-port' = $referencePort; listeners = @(); proxies = @($referenceFront, @{ name = 'standalone-exit'; type = 'socks5'; server = '127.0.0.1'; port = $exitPort; username = $username; password = $password; 'dialer-proxy' = 'standalone-front'; udp = $false }); rules = @('MATCH,standalone-exit') }
+            $readyDeadline = [DateTime]::UtcNow.AddSeconds(5)
+            do {
+                $ready = @(Get-NetTCPConnection -OwningProcess $referenceCore.process.Id -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.LocalAddress -eq '127.0.0.1' -and $_.LocalPort -eq $referencePort }).Count -eq 1
+                if (-not $ready) { Start-Sleep -Milliseconds 100 }
+            } until ($ready -or [DateTime]::UtcNow -gt $readyDeadline)
+            if (-not $ready) { throw 'Independent probe listener did not become ready' }
+            $status = & (Join-Path $env:SystemRoot 'System32\curl.exe') --noproxy never-match.invalid --proxy "http://127.0.0.1:$referencePort" --connect-timeout 3 --max-time 8 --silent --output NUL --write-out '%{http_code}' https://www.gstatic.com/generate_204
+            $result.standaloneProbe = @{ profile = $candidateName; httpStatus = [string]$status; exitCode = $LASTEXITCODE; productApplicationUsed = $false; lines = @(Get-Content -LiteralPath (Join-Path $caseRoot 'standalone-probe/stdout.log') -Encoding UTF8 -Tail 25 | ForEach-Object { [string]$_ }) }
+            $curlDirectory = Join-Path $caseRoot 'standalone-probe'
+            $curlProcess = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\curl.exe') -ArgumentList @('--noproxy', 'never-match.invalid', '--proxy', "http://127.0.0.1:$referencePort", '--connect-timeout', '3', '--max-time', '8', '--verbose', '--output', 'NUL', 'https://www.gstatic.com/generate_204') -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $curlDirectory 'curl-stdout.log') -RedirectStandardError (Join-Path $curlDirectory 'curl-stderr.log')
+            $null = $curlProcess.Handle
+            if (-not $curlProcess.WaitForExit(10000)) { $curlProcess.Kill(); $curlProcess.WaitForExit() }
+            $result.standaloneProbe.curlDetails = @(Get-Content -LiteralPath (Join-Path $curlDirectory 'curl-stderr.log') -Encoding UTF8 -Tail 16 | ForEach-Object { [string]$_ })
+            try {
+                $result.standaloneProbe.coreHttps = Invoke-RestMethod -Uri "http://127.0.0.1:$($referenceCore.port)/proxies/standalone-exit/delay?timeout=8000&expected=204&url=https%3A%2F%2Fwww.gstatic.com%2Fgenerate_204" -Headers @{ Authorization = "Bearer $($referenceCore.token)" } -TimeoutSec 10
+            } catch { $result.standaloneProbe.coreHttpsError = [string]$_.Exception.Message }
+            $trace = Join-Path $data 'test-diagnostic.yaml'
+            if (Test-Path -LiteralPath $trace) {
+                $result.candidateTraceSha256 = (Get-FileHash -LiteralPath $trace -Algorithm SHA256).Hash.ToLowerInvariant()
+                $captured = [IO.File]::ReadAllText($trace)
+                $expectedFront = $chainState.fronts | Where-Object name -eq $candidateName | Select-Object -First 1
+                $result.candidateTraceMatchesProfile = $expectedFront -and $captured.Contains("CHAIN_DESK_NODE_$($expectedFront.id)") -and $captured.Contains('CHAIN_DESK_FIXED_EXIT')
+                if (-not $result.candidateTraceMatchesProfile) { throw 'Captured diagnostic does not contain the failed complete-chain profile; replay omitted' }
+                $captured = [regex]::Replace($captured, '(?m)^external-controller:.*$', "external-controller: 127.0.0.1:$($referenceCore.port)")
+                $captured = [regex]::Replace($captured, '(?m)^secret:.*$', "secret: $($referenceCore.token)")
+                $captured = [regex]::Replace($captured, '(?m)^mixed-port:.*$', "mixed-port: $referencePort")
+                $captured = [regex]::Replace($captured, '(?m)^log-level:.*$', 'log-level: debug')
+                [void](Invoke-RestMethod -Method Put -Uri "http://127.0.0.1:$($referenceCore.port)/configs?force=true" -Headers @{ Authorization = "Bearer $($referenceCore.token)" } -ContentType 'application/json' -Body (@{ payload = $captured } | ConvertTo-Json) -TimeoutSec 5)
+                $status = & (Join-Path $env:SystemRoot 'System32\curl.exe') --noproxy never-match.invalid --proxy "http://127.0.0.1:$referencePort" --connect-timeout 3 --max-time 8 --silent --output NUL --write-out '%{http_code}' https://www.gstatic.com/generate_204
+                $result.capturedCandidateProbe = @{ httpStatus = [string]$status; exitCode = $LASTEXITCODE; overriddenFields = @('external-controller', 'secret', 'mixed-port', 'log-level'); lines = @(Get-Content -LiteralPath (Join-Path $caseRoot 'standalone-probe/stdout.log') -Encoding UTF8 -Tail 25 | ForEach-Object { [string]$_ }) }
+                try {
+                    $result.capturedCandidateProbe.coreHttps = Invoke-RestMethod -Uri "http://127.0.0.1:$($referenceCore.port)/proxies/CHAIN_DESK_FIXED_EXIT/delay?timeout=8000&expected=204&url=https%3A%2F%2Fwww.gstatic.com%2Fgenerate_204" -Headers @{ Authorization = "Bearer $($referenceCore.token)" } -TimeoutSec 10
+                } catch { $result.capturedCandidateProbe.coreHttpsError = [string]$_.Exception.Message }
+            }
+        } catch { $result.standaloneInspectionError = [string]$_.Exception.Message }
+    }
+    if ($Milestone -in @('m3', 'm4') -and $data) {
+        try {
+            $journalPath = Join-Path $data 'proxy-session.bin'
+            if (Test-Path -LiteralPath $journalPath -PathType Leaf) {
+                Add-Type -AssemblyName System.Security
+                $encoded = [IO.File]::ReadAllBytes($journalPath)
+                $journal = [Text.Encoding]::UTF8.GetString([Security.Cryptography.ProtectedData]::Unprotect($encoded[4..($encoded.Length - 1)], $null, [Security.Cryptography.DataProtectionScope]::CurrentUser)) | ConvertFrom-Json
+                $proxyKey = Get-Item 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
+                try {
+                    $names = @('ProxyEnable', 'ProxyServer', 'ProxyOverride', 'AutoConfigURL')
+                    $result.recoveryInspection = @{ phase = [string]$journal.phase; values = @(for ($index = 0; $index -lt 4; $index++) {
+                        $name = $names[$index]
+                        $present = $proxyKey.GetValueNames() -contains $name
+                        @{ name = $name; actualKind = $(if ($present) { [string]$proxyKey.GetValueKind($name) } else { 'Missing' }); actualStringLength = $(if ($present) { ([string]$proxyKey.GetValue($name)).Length } else { 0 }); intendedKind = $journal.applied.values[$index].kind; intendedBytes = $journal.applied.values[$index].bytes.Count }
+                    }) }
+                } finally { $proxyKey.Close() }
+            }
+        } catch { $result.recoveryInspectionError = [string]$_.Exception.Message }
+    }
     if ($Milestone -ne 'm1') {
         $result.fixtureLogTails = @(foreach ($fixture in @('front-fixture', 'exit-fixture')) {
             $path = Join-Path $caseRoot "$fixture\stdout.log"

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "baselineVersion": 5,
-  "confirmedOn": "2026-11-12",
+  "baselineVersion": 6,
+  "confirmedOn": "2026-11-19",
   "timezone": "Asia/Shanghai",
   "purpose": "implementationBaselineNotReleaseAcceptance",
   "source": {
@@ -667,17 +667,18 @@
     },
     {
       "id": "realChainProtocolMatrix",
-      "status": "notRun"
+      "status": "m2HistoricalPublicAndM3ControlledProfilesPassed",
+      "reason": "M2 historical public-chain evidence remains immutable. M3 passed eight encrypted front profiles with authenticated fixed exit and guest-trusted controlled TLS/synthetic IPv4 observations; arbitrary provider configurations are not certified."
     },
     {
       "id": "portableCoexistenceAndRecovery",
-      "status": "m1CoexistencePassedPersistentRecoveryPending",
-      "reason": "M1 standard-user VM passed original-client coexistence, injected port races, proxy/PAC ownership and exact normal-exit restoration; persistent crash recovery and watchdog remain M3."
+      "status": "m3DevelopmentPersistentRecoveryPassed",
+      "reason": "Standard-user disposable VM passed durable ownership, authenticated watchdog, parent/dual termination, independent recovery without WebView, foreign conflict preservation and background recovery; exact accepted evidence is recorded in implementation.m3Acceptance."
     },
     {
       "id": "finalZipCleanVmAcceptance",
-      "status": "m1DevelopmentFullZipPassedFinalReleaseMatrixPending",
-      "reason": "The exact M1 development full ZIP passed 61 checks on a disposable Windows guest. Final signed standard/full release packages and the supported environment matrix remain M4."
+      "status": "m3DevelopmentFullZipPassedFinalReleaseMatrixPending",
+      "reason": "The exact M3 development full ZIP passed 141 checks in a disposable Windows guest. Final signed standard/full packages and the supported environment matrix remain M4."
     },
     {
       "id": "publisherSigningAssets",
@@ -701,19 +702,19 @@
     }
   },
   "implementation": {
-    "milestone": "M2",
-    "status": "minimalWorkflowAcceptancePassed",
+    "milestone": "M3",
+    "status": "reliabilityAcceptancePassed",
     "sourceBranch": "chaindesk/main",
-    "reuseAudit": "链式代理便携客户端-M2实施与验收.md",
+    "reuseAudit": "链式代理便携客户端-M3实施与验收.md",
     "logsDirectory": ".chaindesk/logs",
     "applicationBusinessSourceModified": true,
     "upstreamBuildAndUpdateCommandsModified": true,
     "portableClientDelivered": true,
-    "deliveryScope": "M2DevelopmentWorkflowNotFinalRelease",
+    "deliveryScope": "M3DevelopmentReliabilityNotFinalRelease",
     "localTrackingApproval": "remainingPlanAuthorizedInChatOn2026-11-12",
     "m0Commit": "fc1f269bb3e5df1460207530d2c89b2d2a623485",
     "m0Tag": "chaindesk-m0-20261111",
-    "milestoneTag": "chaindesk-m2-20261112",
+    "milestoneTag": "chaindesk-m3-20261119",
     "customLockfiles": {
       "Cargo.lock": {
         "sha256": "768a2b5a705809fb2708098b47c2b1ac7091a85040eb0720c284250ab34cdc99",
@@ -732,6 +733,23 @@
       "applicationSha256": "a26ae28023abceba0c44285b0bc3e8b195ca2c16c6bd158eaffab5fd38db9ed0",
       "isolatedDiagnosticsAccepted": false,
       "persistentRecoveryAccepted": false,
+      "publisherSigningAccepted": false
+    },
+    "deliveryIntent": "internalDevelopmentAcceptanceOnly",
+    "m2Commit": "1c6bb3669402e3dc6053621537992db4da9c76c3",
+    "m2Tag": "chaindesk-m2-20261112",
+    "m3Acceptance": {
+      "vmEvidence": ".chaindesk/logs/m3-vm-evidence.json",
+      "vmChecksPassed": 141,
+      "verifiedProtocolProfiles": 8,
+      "protocolObservationScope": "controlledTlsAndSyntheticIpv4WithRealFrontAndAuthenticatedExit",
+      "guestPoweredOff": true,
+      "guestShutdownReason": "guest-shutdown",
+      "archiveSha256": "b53eeaf50e2a1d5e9959060b8c70c5780b1251e2170f289e797096b1bb154c05",
+      "sourceFingerprint": "7426f6600bfb6d3c324c75427ec77e0148b6d40819c4c3659decb3d8bb3f0d63",
+      "applicationSha256": "9a3fd2cc60e4e4ba60365f8a80b42bb820e92fa80e3cdebe35a639d7e70b6317",
+      "isolatedDiagnosticsAccepted": true,
+      "persistentRecoveryAccepted": true,
       "publisherSigningAccepted": false
     }
   },

@@ -27,6 +27,18 @@ export const commands = {
     __TAURI_INVOKE<ChainView>('connect_chain', { input }),
   disconnectChain: () => __TAURI_INVOKE<ChainView>('disconnect_chain'),
   cancelChainConnection: () => __TAURI_INVOKE<null>('cancel_chain_connection'),
+  restoreChainLastGood: () =>
+    __TAURI_INVOKE<ChainView>('restore_chain_last_good'),
+  confirmChainIpv4: (ipv4: string) =>
+    __TAURI_INVOKE<ChainView>('confirm_chain_ipv4', { ipv4 }),
+  previewChainDiagnostics: () =>
+    __TAURI_INVOKE<DiagnosticPreview>('preview_chain_diagnostics'),
+  exportChainDiagnostics: (path: string, expectedSha256: string) =>
+    __TAURI_INVOKE<null>('export_chain_diagnostics', { path, expectedSha256 }),
+  keepChainCurrentProxy: () =>
+    __TAURI_INVOKE<ChainView>('keep_chain_current_proxy'),
+  setChainBackgroundChecks: (enabled: boolean) =>
+    __TAURI_INVOKE<ChainView>('set_chain_background_checks', { enabled }),
   saveProxyPorts: (settings: ProxyPortSettings) =>
     __TAURI_INVOKE<SaveProxyPortsOutcome>('save_proxy_ports', { settings }),
   getSysProxy: () => __TAURI_INVOKE<SystemProxy>('get_sys_proxy'),
@@ -285,7 +297,12 @@ export type ChainView = {
   preset: RulePreset
   probeConsent: boolean
   backgroundChecks: boolean
+  expectedIpv4: string | null
+  canRestoreLastGood: boolean
+  automaticFront: boolean
   observation: ProbeObservation | null
+  candidateObservation: ProbeObservation | null
+  healthCheckedAt: string | null
   error: ChainErrorView | null
   capabilityVersion: number
 }
@@ -331,6 +348,10 @@ export type ConnectInput = {
   preset: RulePreset
   probeConsent: boolean
   backgroundChecks: boolean
+  automaticFront?: boolean
+  exit?: ExitInput | null
+  expectedIpv4?: string | null
+  closeExistingConnections?: boolean
 }
 
 /**  Why the Core is not running, kept until a Core starts again. */
@@ -346,6 +367,11 @@ export type CoreUpgradeReport = {
 export type DelayHistory = {
   time: string
   delay: number
+}
+
+export type DiagnosticPreview = {
+  json: string
+  sha256: string
 }
 
 export type DnsOverrideOutcome =
@@ -624,6 +650,12 @@ export type IpAddress = {
   ip: string
 }
 
+export type IpObservation = {
+  ipv4: string
+  checkedAt: string
+  service: string
+}
+
 export type JsonValue =
   | null
   | boolean
@@ -812,6 +844,8 @@ export type ProbeObservation = {
   checkedAt: string
   service: string
   elapsedMs: number
+  sources: IpObservation[]
+  consistent: boolean
 }
 
 export type ProfileCreate = ProfileCreate_Serialize | ProfileCreate_Deserialize

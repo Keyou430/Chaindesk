@@ -25,7 +25,7 @@ function Start-FixtureCore([string]$Name, $Configuration) {
     }
     $controllerPort = Get-FixturePort
     $token = [Guid]::NewGuid().ToString('N') + [Guid]::NewGuid().ToString('N')
-    $base = @{ 'allow-lan' = $false; 'bind-address' = '127.0.0.1'; 'external-controller' = "127.0.0.1:$controllerPort"; secret = $token; mode = 'rule'; ipv6 = $false; 'geo-auto-update' = $false; 'geodata-mode' = $true; 'log-level' = 'warning'; dns = @{ enable = $false }; tun = @{ enable = $false }; rules = @('MATCH,DIRECT') }
+    $base = @{ 'allow-lan' = $false; 'bind-address' = '127.0.0.1'; 'external-controller' = "127.0.0.1:$controllerPort"; secret = $token; mode = 'rule'; ipv6 = $false; 'geo-auto-update' = $false; 'geodata-mode' = $true; 'log-level' = 'debug'; dns = @{ enable = $false }; tun = @{ enable = $false }; rules = @('MATCH,DIRECT') }
     foreach ($key in $Configuration.Keys) { $base[$key] = $Configuration[$key] }
     $configurationPath = Join-Path $directory 'fixture.json'
     [IO.File]::WriteAllText($configurationPath, ($base | ConvertTo-Json -Depth 30), [Text.UTF8Encoding]::new($false))
@@ -50,6 +50,20 @@ function Start-FixtureCore([string]$Name, $Configuration) {
 function Get-FixtureTraffic($Fixture) {
     $connections = Invoke-RestMethod -Uri "http://127.0.0.1:$($Fixture.port)/connections" -Headers @{ Authorization = "Bearer $($Fixture.token)" } -TimeoutSec 5
     return [long]$connections.downloadTotal + [long]$connections.uploadTotal
+}
+
+function Set-ProbeFixtureMode([string]$Mode) {
+    return Invoke-RestMethod -Method Post -Uri "$Controller/probe-fixture" -ContentType 'application/json' -Body (@{ mode = $Mode } | ConvertTo-Json -Compress) -TimeoutSec 5
+}
+
+function Enable-FixtureProbeRoutes([string]$Name, $Fixture, [int]$Port) {
+    $path = Join-Path $caseRoot "$Name\fixture.json"
+    $configuration = [IO.File]::ReadAllText($path) | ConvertFrom-Json
+    $configuration | Add-Member -NotePropertyName proxies -NotePropertyValue @(@{ name = 'CHAIN_DESK_TEST_PROBES'; type = 'http'; server = '10.0.2.2'; port = $Port }) -Force
+    $configuration.rules = @('www.gstatic.com', 'cp.cloudflare.com', 'api.ipify.org', 'www.cloudflare.com' | ForEach-Object { "DOMAIN,$_,CHAIN_DESK_TEST_PROBES" }) + @('MATCH,DIRECT')
+    $json = $configuration | ConvertTo-Json -Depth 30
+    [void](Invoke-RestMethod -Method Put -Uri "http://127.0.0.1:$($Fixture.port)/configs?force=true" -Headers @{ Authorization = "Bearer $($Fixture.token)" } -ContentType 'application/json' -Body (@{ payload = $json } | ConvertTo-Json -Depth 32) -TimeoutSec 10)
+    [IO.File]::WriteAllText($path, $json, [Text.UTF8Encoding]::new($false))
 }
 
 $tls = Join-Path $caseRoot 'tls'
@@ -108,6 +122,18 @@ foreach ($protocol in @('trojan', 'anytls')) {
 }
 $frontFixture = Start-FixtureCore 'front-fixture' @{ listeners = $listeners }
 Confirm-Check ($true) 'Owned loopback fixtures started for front protocol matrix and authenticated exit'
+$controlledProbes = $Milestone -in @('m3', 'm4')
+if ($controlledProbes) {
+    $result.publicEndpointAvailability = @(foreach ($url in @('https://www.gstatic.com/generate_204', 'https://cp.cloudflare.com/generate_204', 'https://api.ipify.org?format=json', 'https://www.cloudflare.com/cdn-cgi/trace')) {
+        $status = & (Join-Path $env:SystemRoot 'System32\curl.exe') --noproxy '*' --connect-timeout 3 --max-time 8 --silent --output NUL --write-out '%{http_code}' $url
+        @{ service = $url.Split('?')[0]; httpStatus = [string]$status; exitCode = $LASTEXITCODE; throughProductChain = $false }
+    })
+    $probeFixture = Set-ProbeFixtureMode 'ok'
+    Enable-FixtureProbeRoutes 'front-fixture' $frontFixture $probeFixture.proxyPort
+    Enable-FixtureProbeRoutes 'exit-fixture' $exitFixture $probeFixture.proxyPort
+    $result.ipv4ObservationFixture = @{ synthetic = $true; trustScope = 'Disposable guest CurrentUser only'; addresses = @('203.0.113.80', '203.0.113.81'); controlledHttpsForReliability = $true; publicProductChainCertifiedByThisRun = $false }
+    Confirm-Check ($true) 'Reliability probes use a guest-trusted controlled TLS service through the real front and authenticated fixed exit; public endpoint availability is recorded separately'
+}
 $result.protocolMatrix = @()
 $duplicate = @{}; foreach ($key in $nodes[0].Keys) { $duplicate[$key] = $nodes[0][$key] }; $duplicate.name = 'duplicate renamed'
 $sameExit = @{ name = 'same exit'; type = 'ss'; server = '127.0.0.1'; port = $exitPort; cipher = 'aes-128-gcm'; password = 'unused' }
@@ -117,13 +143,17 @@ $expectedNodeCount = $nodes.Count + 4
 $subscriptionPath = Join-Path $caseRoot 'subscription.yaml'
 $source = @{ proxies = @($nodes) + @($duplicate, $sameExit, @{ name = 'notice'; type = 'ss'; server = ''; port = 0 }, $badVless, $badVmess); tun = @{ enable = $true }; 'external-controller' = '0.0.0.0:9999' } | ConvertTo-Json -Depth 25
 [IO.File]::WriteAllText($subscriptionPath, $source, [Text.UTF8Encoding]::new($false))
-Start-Product $root
 $data = Join-Path $root 'data'
+Start-Product $root
 $beforeProxy = Get-ProxySnapshot
 $state = Invoke-ChainCommand 'get_chain_state'
 Confirm-Check ($state.phase -eq 'unconfigured' -and -not $state.subscriptionName) 'Blank home requires subscription and exit without automatic proxy acquisition'
 $document = Invoke-DebuggerExpression "({title:document.title,text:document.body.innerText,inputs:document.querySelectorAll('input').length})"
 Confirm-Check ($document.title -eq 'ChainDesk' -and $document.inputs -ge 3) 'Simple chain home renders inputs'
+if ($Milestone -in @('m3', 'm4')) {
+    $stable = Invoke-DebuggerExpression 'Promise.all([...Array.from({length:128},()=>window.__TAURI_INTERNALS__.invoke("get_runtime_state")),...Array.from({length:32},()=>window.__TAURI_INTERNALS__.invoke("get_chain_state"))]).then(values=>values.length===160)' $socket 30000
+    Confirm-Check ($stable -and -not $application.HasExited) 'Concurrent read-only runtime and chain queries retain a responsive native application'
+}
 $state = Invoke-ChainCommand 'import_chain_file' @{ path = $subscriptionPath }
 Confirm-Check ($state.duplicates -eq 1 -and $state.fronts.Count -eq $expectedNodeCount) 'Bounded importer deduplicates identical nodes while retaining independent identities'
 Confirm-Check (@($state.fronts | Where-Object { $_.name -like 'unsupported *' -and $_.rejection }).Count -eq 2) 'Unsupported plaintext VLESS and unencrypted VMess profiles are visibly ineligible'
@@ -183,19 +213,34 @@ foreach ($profile in $nodes) {
         $deadline = [DateTime]::UtcNow.AddSeconds(45)
         do { Start-Sleep -Milliseconds 500; $state = Invoke-ChainCommand 'get_chain_state' } until ($state.phase -eq 'connected' -or $state.error -or [DateTime]::UtcNow -gt $deadline)
     } else {
-        $state = Invoke-ChainCommand 'connect_chain' @{ input = @{ frontId = $candidate.id; preset = 'allProxy'; probeConsent = $true; backgroundChecks = $false } }
+        $profileInput = @{ frontId = $candidate.id; preset = 'allProxy'; probeConsent = $true; backgroundChecks = $false }
+        if ($controlledProbes) {
+            Start-ConnectionRequest $profileInput
+            $response = Wait-ConnectionRequest
+            if (-not $response.ok) { throw "Protocol profile failed: $($profile.name): $($response.code)" }
+            $state = $response.value
+        } else {
+            $state = Invoke-ChainCommand 'connect_chain' @{ input = $profileInput }
+        }
     }
-    Confirm-Check ($state.phase -eq 'connected' -and $state.observation.ipv4 -match '^\d+\.\d+\.\d+\.\d+$') "Complete HTTPS chain and IPv4 observation passed: $($profile.name)"
+    $observedIpv4 = $state.observation.ipv4 -match '^\d+\.\d+\.\d+\.\d+$'
+    $serviceScope = if ($controlledProbes) { 'controlled TLS fixture' } else { 'public services' }
+    Confirm-Check ($state.phase -eq 'connected' -and ($observedIpv4 -or $state.error.code -eq 'EXIT_IP_UNAVAILABLE')) "Complete HTTPS chain passed against $serviceScope with an observation or explicit query-unavailability warning: $($profile.name)"
     $frontAfter = Get-FixtureTraffic $frontFixture
     $exitAfter = Get-FixtureTraffic $exitFixture
     Confirm-Check ($frontAfter -gt $frontBefore -and $exitAfter -gt $exitBefore) "Both front and authenticated SOCKS5 exit carried traffic: $($profile.name)"
     $preview = Invoke-ChainCommand 'get_runtime_yaml'
     Confirm-Check (-not $preview.Contains($password) -and -not $preview.Contains($frontPassword) -and -not $preview.Contains($uuid)) 'Runtime preview redacts all authentication fields'
-    $result.protocolMatrix += @{ profile = $profile.name; connected = $true; frontTrafficIncreased = $true; exitTrafficIncreased = $true; certificateVerificationDisabled = $false }
+    $result.protocolMatrix += @{ profile = $profile.name; connected = $true; frontTrafficIncreased = $true; exitTrafficIncreased = $true; certificateVerificationDisabled = $false; syntheticObservation = [bool]$controlledProbes; publicIpv4Observed = [bool]($observedIpv4 -and -not $controlledProbes); observationWarning = [string]$state.error.code }
     $state = Invoke-ChainCommand 'disconnect_chain'
     Confirm-Check ($state.phase -eq 'disconnected' -and (Get-ProxySnapshot) -eq $beforeProxy -and (Get-Process -Id $originalCoreId -ErrorAction SilentlyContinue)) 'Disconnect restores exact proxy state and preserves original core'
     $remaining = @(Get-ChildItem -LiteralPath (Join-Path $data 'runtime') -Filter 'clash-verge*.yaml' -Recurse -File)
     Confirm-Check ($remaining.Count -eq 0) 'Disconnected core retains no plaintext working or validation configuration'
+    if ($controlledProbes -and $profile.name -eq $nodes[0].name) {
+        $recoveryScenario = Join-Path $PSScriptRoot 'recovery-vm-scenario.ps1'
+        $result.recoveryScenarioSha256 = (Get-FileHash -LiteralPath $recoveryScenario -Algorithm SHA256).Hash.ToLowerInvariant()
+        . $recoveryScenario
+    }
 }
 $frontBefore = Get-FixtureTraffic $frontFixture
 $exitBefore = Get-FixtureTraffic $exitFixture

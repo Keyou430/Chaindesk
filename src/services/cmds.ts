@@ -34,6 +34,15 @@ export const connectChain = (input: ConnectInput) =>
   commands.connectChain(input)
 export const disconnectChain = () => commands.disconnectChain()
 export const cancelChainConnection = () => commands.cancelChainConnection()
+export const restoreChainLastGood = () => commands.restoreChainLastGood()
+export const confirmChainIpv4 = (ipv4: string) =>
+  commands.confirmChainIpv4(ipv4)
+export const previewChainDiagnostics = () => commands.previewChainDiagnostics()
+export const exportChainDiagnostics = (path: string, expectedSha256: string) =>
+  commands.exportChainDiagnostics(path, expectedSha256)
+export const keepChainCurrentProxy = () => commands.keepChainCurrentProxy()
+export const setChainBackgroundChecks = (enabled: boolean) =>
+  commands.setChainBackgroundChecks(enabled)
 
 export type {
   RunningMode,

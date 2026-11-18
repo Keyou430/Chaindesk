@@ -139,13 +139,23 @@ pub(crate) enum ChainPhase {
     RecoveryRequired,
 }
 
-#[derive(Clone, Default, Serialize, specta::Type)]
+#[derive(Clone, Default, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct IpObservation {
+    pub ipv4: String,
+    pub checked_at: String,
+    pub service: String,
+}
+
+#[derive(Clone, Default, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProbeObservation {
     pub ipv4: String,
     pub checked_at: String,
     pub service: String,
     pub elapsed_ms: u32,
+    pub sources: Vec<IpObservation>,
+    pub consistent: bool,
 }
 
 #[derive(Clone, Serialize, specta::Type)]
@@ -175,7 +185,12 @@ pub(crate) struct ChainView {
     pub preset: RulePreset,
     pub probe_consent: bool,
     pub background_checks: bool,
+    pub expected_ipv4: Option<String>,
+    pub can_restore_last_good: bool,
+    pub automatic_front: bool,
     pub observation: Option<ProbeObservation>,
+    pub candidate_observation: Option<ProbeObservation>,
+    pub health_checked_at: Option<String>,
     pub error: Option<ChainErrorView>,
     pub capability_version: u32,
 }
@@ -187,6 +202,21 @@ pub(crate) struct ConnectInput {
     pub preset: RulePreset,
     pub probe_consent: bool,
     pub background_checks: bool,
+    #[serde(default)]
+    pub automatic_front: bool,
+    #[serde(default)]
+    pub exit: Option<ExitInput>,
+    #[serde(default)]
+    pub expected_ipv4: Option<String>,
+    #[serde(default)]
+    pub close_existing_connections: bool,
+}
+
+#[derive(Clone, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct DiagnosticPreview {
+    pub json: String,
+    pub sha256: String,
 }
 
 pub(crate) fn normalize_host(input: &str) -> Result<String> {

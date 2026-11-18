@@ -2,6 +2,8 @@ mod config;
 pub(crate) use config::ConfigUpdateGuard;
 mod lifecycle;
 mod state;
+#[cfg(windows)]
+pub(crate) use state::create_and_assign_sidecar_job;
 
 use anyhow::Result;
 use arc_swap::{ArcSwap, ArcSwapOption};

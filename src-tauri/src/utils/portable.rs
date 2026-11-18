@@ -17,6 +17,11 @@ pub(crate) fn paths() -> Result<&'static PortablePaths> {
 }
 
 pub(crate) fn initialize() -> Result<()> {
+    initialize_paths()?;
+    initialize_browser()
+}
+
+pub(crate) fn initialize_paths() -> Result<()> {
     let executable = std::env::current_exe().context("could not locate ChainDesk.exe")?;
     let root = executable
         .parent()
@@ -62,6 +67,14 @@ pub(crate) fn initialize() -> Result<()> {
     for name in ["logs", "backups", "runtime", "temp", "webview"] {
         create_private_current_user_directory(&data.join(name))?;
     }
+    PATHS
+        .set(PortablePaths { root, data })
+        .map_err(|_| anyhow::anyhow!("portable paths are already initialized"))?;
+    Ok(())
+}
+
+fn initialize_browser() -> Result<()> {
+    let PortablePaths { root, data } = paths()?;
     let runtime = root.join("runtime");
     if runtime.exists() {
         crate::core::portable::verify_file(
@@ -93,8 +106,5 @@ pub(crate) fn initialize() -> Result<()> {
             "WebView2 {version} is too old; use the full ChainDesk package or update WebView2 to 157.0.4341.46 or newer"
         );
     }
-    PATHS
-        .set(PortablePaths { root, data })
-        .map_err(|_| anyhow::anyhow!("portable paths are already initialized"))?;
     Ok(())
 }

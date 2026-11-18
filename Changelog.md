@@ -1,3 +1,16 @@
+## ChainDesk M3 (development)
+
+<details>
+<summary><strong> ✨ 新增功能 </strong></summary>
+
+**🖥️ Windows**
+
+- Windows：新增整链检测、出口基准确认与前置节点自动选择
+- Windows：新增最后可用连接恢复、异常退出后的代理恢复与冲突提示
+- Windows：新增脱敏诊断预览与导出
+
+</details>
+
 ## ChainDesk M2 (development)
 
 <details>

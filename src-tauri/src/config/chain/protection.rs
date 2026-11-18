@@ -10,14 +10,14 @@ use windows::{
 
 const HEADER: &[u8] = b"CDP\x01";
 
-pub(super) fn protect(plaintext: &[u8]) -> Result<Vec<u8>> {
+pub(crate) fn protect(plaintext: &[u8]) -> Result<Vec<u8>> {
     let output = transform(plaintext, true)?;
     let mut encoded = HEADER.to_vec();
     encoded.extend(output);
     Ok(encoded)
 }
 
-pub(super) fn unprotect(encoded: &[u8]) -> Result<Vec<u8>> {
+pub(crate) fn unprotect(encoded: &[u8]) -> Result<Vec<u8>> {
     let payload = encoded.strip_prefix(HEADER).ok_or_else(|| {
         failure(
             "CREDENTIAL_STORE_FAILED",

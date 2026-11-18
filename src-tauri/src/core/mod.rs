@@ -1,6 +1,8 @@
 pub mod auto_backup;
 pub mod autostart;
 pub mod backup;
+#[cfg(windows)]
+pub(crate) mod chain_diagnostic;
 pub(crate) mod chain_probe;
 pub mod hotkey;
 pub mod lightweight;
@@ -14,9 +16,15 @@ pub(crate) mod owner_identity;
 #[cfg(windows)]
 pub(crate) mod portable;
 #[cfg(windows)]
-mod portable_proxy;
+pub(crate) mod portable_network;
+#[cfg(windows)]
+pub(crate) mod portable_proxy;
+#[cfg(windows)]
+pub(crate) mod process_identity;
 pub mod proxy_control;
 pub mod proxy_view;
+#[cfg(windows)]
+pub(crate) mod proxy_watchdog;
 pub mod runstate;
 pub(crate) mod runtime_bundle;
 pub mod service;

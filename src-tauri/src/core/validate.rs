@@ -347,6 +347,24 @@ impl CoreConfigValidator {
         Self::validate_config_internal_outcome(config_path).await
     }
 
+    #[cfg(windows)]
+    async fn validate_config_internal_outcome(config_path: &str) -> Result<ValidationOutcome> {
+        if handle::Handle::global().is_exiting() {
+            return Ok(ValidationOutcome::Skipped {
+                reason: ValidationSkipReason::Exiting,
+            });
+        }
+        if super::chain_diagnostic::validate_existing(std::path::Path::new(config_path)).await? {
+            Ok(ValidationOutcome::Valid)
+        } else {
+            Ok(ValidationOutcome::invalid(
+                ValidationErrorKind::CoreRejected,
+                "The fixed core validation failed or timed out. Raw output was withheld to protect credentials.",
+            ))
+        }
+    }
+
+    #[cfg(not(windows))]
     async fn validate_config_internal_outcome(config_path: &str) -> Result<ValidationOutcome> {
         if handle::Handle::global().is_exiting() {
             logging!(info, Type::Validate, "应用正在退出，跳过验证");
@@ -455,6 +473,7 @@ fn has_ext<P: AsRef<std::path::Path>>(path: P, ext: &str) -> bool {
         .unwrap_or(false)
 }
 
+#[cfg(not(windows))]
 fn contains_any_keyword<'a>(buf: &'a [u8], keywords: &'a [&str]) -> bool {
     for &kw in keywords {
         let needle = kw.as_bytes();
