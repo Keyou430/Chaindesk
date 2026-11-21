@@ -1,0 +1,14 @@
+{
+  "front": {
+    "server": "192.0.2.10",
+    "port": 8388,
+    "cipher": "aes-128-gcm",
+    "password": "REPLACE_WITH_TEST_FRONT_PASSWORD"
+  },
+  "exit": {
+    "server": "192.0.2.20",
+    "port": 1080,
+    "username": "REPLACE_WITH_TEST_EXIT_USERNAME",
+    "password": "REPLACE_WITH_TEST_EXIT_PASSWORD"
+  }
+}

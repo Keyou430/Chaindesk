@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "purpose": "A0 fd ownership and required SOCKS5 authentication; verified private module copies and temporary modfile",
+  "files": [
+    {
+      "modulePath": "github.com/metacubex/gvisor@v0.0.0-20260922041103-e2cbcd6e7400/pkg/tcpip/link/fdbased/packet_dispatchers.go",
+      "sourceSha256": "ae3d42b25774148658759ff32f2e5d10a0d93f28db13791656835ad4417412f0",
+      "outputName": "gvisor-packet_dispatchers.go",
+      "edits": [
+        {
+          "before": "import (\n",
+          "after": "import (\n\t\"sync\"\n"
+        },
+        {
+          "before": "type readVDispatcher struct {\n\tstopfd.StopFD",
+          "after": "type readVDispatcher struct {\n\tstopfd.StopFD\n\tstopOnce sync.Once\n\treleaseOnce sync.Once"
+        },
+        {
+          "before": "func (d *readVDispatcher) release() {\n\td.buf.release()\n\td.mgr.close()\n}",
+          "after": "func (d *readVDispatcher) Stop() {\n\td.stopOnce.Do(d.StopFD.Stop)\n}\n\nfunc (d *readVDispatcher) release() {\n\td.releaseOnce.Do(func() {\n\t\td.Stop()\n\t\td.buf.release()\n\t\td.mgr.close()\n\t\t_ = unix.Close(d.EFD)\n\t})\n}"
+        }
+      ]
+    },
+    {
+      "modulePath": "github.com/metacubex/gvisor@v0.0.0-20260922041103-e2cbcd6e7400/pkg/tcpip/link/fdbased/endpoint.go",
+      "sourceSha256": "02777ed32eb038951e0f5d69f91a690fdc89283d0de0c445cdf5c0de2b36794a",
+      "outputName": "gvisor-endpoint.go",
+      "edits": [
+        {
+          "before": "func (e *endpoint) Close() {}",
+          "after": "func (e *endpoint) Close() {\n\te.Attach(nil)\n\te.Wait()\n\tfor _, dispatcher := range e.inboundDispatchers {\n\t\tdispatcher.release()\n\t}\n}"
+        }
+      ]
+    },
+    {
+      "modulePath": "github.com/metacubex/sing-tun@v0.4.28/stack_gvisor.go",
+      "sourceSha256": "45fb9d63e825c40f90797535d299e44cd1a9737ec08e112cc3d4b53b6fa89180",
+      "outputName": "sing-tun-stack_gvisor.go",
+      "edits": [
+        {
+          "before": "ipStack, err := NewGVisorStackWithOptions(linkEndpoint, nicOptions)\n\tif err != nil {\n\t\treturn err\n\t}",
+          "after": "ipStack, err := NewGVisorStackWithOptions(linkEndpoint, nicOptions)\n\tif err != nil {\n\t\tlinkEndpoint.Close()\n\t\treturn err\n\t}"
+        }
+      ]
+    },
+    {
+      "modulePath": "github.com/metacubex/mihomo@v1.19.33/transport/socks5/socks5.go",
+      "sourceSha256": "d1a79ea49d3567e4cd3d42477cb3984b1fee38fd3ccea6f5b435c70701e104fd",
+      "outputName": "mihomo-socks5.go",
+      "edits": [
+        {
+          "before": "\tif buf[1] == 2 {\n\t\tif user == nil {",
+          "after": "\tif user != nil && buf[1] != 2 {\n\t\treturn nil, ErrAuth\n\t}\n\n\tif buf[1] == 2 {\n\t\tif user == nil {"
+        }
+      ]
+    }
+  ]
+}

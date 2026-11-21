@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "ruleVersion": "meta-rules-dat-19f81c0fda5b505c0b186bcbc67cc5f8226aafd3",
+  "repository": "https://github.com/MetaCubeX/meta-rules-dat",
+  "artifactCommit": "19f81c0fda5b505c0b186bcbc67cc5f8226aafd3",
+  "sourceCommit": "4178770badecb1b349fbcd62c737e0d7a2079729",
+  "publishedAt": "2026-11-21T03:21:19Z",
+  "files": [
+    {
+      "name": "geoip.dat",
+      "sha256": "d4ec4c5e5d5a38c1399964ea9fd8c94288426a3b31b483904b67819fc07f4466",
+      "bytes": 16503149,
+      "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/19f81c0fda5b505c0b186bcbc67cc5f8226aafd3/geoip.dat"
+    },
+    {
+      "name": "geosite.dat",
+      "sha256": "55c0ff0bb7a75de661de7a30984ece344d9c7840a37a92893b59af9f4baed280",
+      "bytes": 4349121,
+      "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/19f81c0fda5b505c0b186bcbc67cc5f8226aafd3/geosite.dat"
+    }
+  ],
+  "licenses": [
+    {
+      "name": "LICENSE-meta-rules-dat.txt",
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "bytes": 35149,
+      "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/964be7423e659538e4aa4b77ff908188b7102890/LICENSE",
+      "repository": "MetaCubeX/meta-rules-dat",
+      "license": "GPL-3.0",
+      "licenseCommit": "964be7423e659538e4aa4b77ff908188b7102890"
+    },
+    {
+      "name": "LICENSE-ios-rule-script.txt",
+      "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
+      "bytes": 18092,
+      "url": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/af86d247579d6c78c074e6683c81603dbce51d3e/LICENSE",
+      "repository": "blackmatrix7/ios_rule_script",
+      "license": "GPL-2.0",
+      "licenseCommit": "af86d247579d6c78c074e6683c81603dbce51d3e"
+    },
+    {
+      "name": "LICENSE-geoip.txt",
+      "sha256": "5e436ff8ffbb77d8607220e9bce20c8915d860010feeb6c1ebef5a85688e9b39",
+      "bytes": 20137,
+      "url": "https://raw.githubusercontent.com/Loyalsoldier/geoip/4beadd53d768dbe035611cb0cc62f18f3391cf52/LICENSE",
+      "repository": "Loyalsoldier/geoip",
+      "license": "CC-BY-SA-4.0",
+      "licenseCommit": "4beadd53d768dbe035611cb0cc62f18f3391cf52"
+    },
+    {
+      "name": "LICENSE-domain-list-community.txt",
+      "sha256": "b9d84a22870d3f21c91a4c6e410c9cc51d00902f5233ad0c84011479244bf7d2",
+      "bytes": 1067,
+      "url": "https://raw.githubusercontent.com/v2fly/domain-list-community/22f1fbf7ef812e1ff38cf5406c6e0c8e36fd8cd3/LICENSE",
+      "repository": "v2fly/domain-list-community",
+      "license": "MIT",
+      "licenseCommit": "22f1fbf7ef812e1ff38cf5406c6e0c8e36fd8cd3"
+    },
+    {
+      "name": "LICENSE-domain-list-custom.txt",
+      "sha256": "35f18e0331a1ecd1835400c50e3b367c2ce09f6c13d91c4a0f3cb11f71d3bbc3",
+      "bytes": 1069,
+      "url": "https://raw.githubusercontent.com/Loyalsoldier/domain-list-custom/42c2ceee4adad651f6d9606ea52ce41c30df7aac/LICENSE",
+      "repository": "Loyalsoldier/domain-list-custom",
+      "license": "MIT",
+      "licenseCommit": "42c2ceee4adad651f6d9606ea52ce41c30df7aac"
+    }
+  ]
+}

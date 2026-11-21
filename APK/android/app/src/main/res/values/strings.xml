@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ChainDesk</string>
+    <string name="probe_running">Checking the native core…</string>
+    <string name="probe_description">A0 development probe. Load a dedicated SS → SOCKS5 test fixture, then authorize the VPN. Traffic and device compatibility have not been accepted. Test credentials remain in memory only.</string>
+    <string name="probe_failure">Native check failed: %1$s</string>
+    <string name="fixture_import">Load A0 test fixture</string>
+    <string name="fixture_ready">Fixture validated. VPN has not started.</string>
+    <string name="fixture_invalid">Invalid fixture, active session, or native core unavailable.</string>
+    <string name="vpn_start">Authorize and start A0 VPN</string>
+    <string name="vpn_stop">Stop VPN</string>
+    <string name="vpn_channel">A0 VPN probe</string>
+    <string name="vpn_starting">Starting development VPN…</string>
+    <string name="vpn_tun_ready">TUN running · chain traffic unverified</string>
+    <string name="vpn_blocked">Probe failed or network changed · stop VPN before retrying</string>
+    <string name="vpn_not_established">VPN was not established. This attempt did not capture traffic.</string>
+    <string name="vpn_requested">Start requested. Check the VPN notification; this is not a verified connection result.</string>
+    <string name="vpn_denied">VPN authorization was not granted.</string>
+    <string name="notification_required">Allow notifications to keep the A0 VPN status and stop action visible.</string>
+</resources>

@@ -1,0 +1,12 @@
+/android/.gradle/
+/android/.kotlin/
+/android/**/build/
+/android/**/.cxx/
+/android/local.properties
+/android/coreBridge/src/main/jniLibs/
+/.cache/
+/.tools/
+/dist/
+*.jks
+*.keystore
+signing.properties

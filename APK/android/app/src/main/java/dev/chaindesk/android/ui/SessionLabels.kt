@@ -1,0 +1,85 @@
+package dev.chaindesk.android.ui
+
+import dev.chaindesk.android.session.SessionPhase
+import dev.chaindesk.android.session.SessionState
+
+object SessionLabels {
+    fun title(state: SessionState): String = when (state.phase) {
+        SessionPhase.Unconfigured -> "尚未完成配置"
+        SessionPhase.Ready -> "可以连接"
+        SessionPhase.Connecting -> "正在建立链路"
+        SessionPhase.Probing -> "正在验证整链"
+        SessionPhase.Connected -> "整链验证通过"
+        SessionPhase.Degraded -> "链路需要恢复"
+        SessionPhase.Disconnecting -> "正在断开"
+        SessionPhase.Disconnected -> "已断开"
+        SessionPhase.RecoveryRequired -> "连接未完成"
+    }
+
+    fun detail(state: SessionState): String = when (state.phase) {
+        SessionPhase.Unconfigured -> "导入订阅，配置固定 SOCKS5 出口，再选择前置节点。"
+        SessionPhase.Ready -> "连接后将检查整链 HTTPS 可达性，并单独观察出口 IPv4。"
+        SessionPhase.Connecting -> "正在建立前置与固定出口链路，可随时取消。"
+        SessionPhase.Probing -> "VPN 已接管流量；整链 HTTPS 检查尚未完成。"
+        SessionPhase.Connected -> "本次整链 HTTPS 检查已通过。出口地址观察结果见下方。"
+        SessionPhase.Degraded -> if (state.tunCaptured) "VPN 仍接管流量，受代理流量保持阻断；可切换前置或断开。" else "当前链路不可用，请检查配置后重试。"
+        SessionPhase.Disconnecting -> "正在停止内核并释放 VPN，请稍候。"
+        SessionPhase.Disconnected -> "VPN 已停止接管，可修改配置或重新连接。"
+        SessionPhase.RecoveryRequired -> if (state.tunCaptured) "VPN 仍接管流量，请切换前置或断开后重试。" else "本次连接未完成，请查看错误并重试。"
+    }
+
+    fun code(value: String): String = value.takeIf { it.matches(Regex("[A-Z][A-Z0-9_]{0,63}")) } ?: "UNKNOWN_ERROR"
+
+    fun error(code: String): String = when (code) {
+        "NO_VALID_FRONT" -> "没有可用前置，请导入有效订阅或解除节点排除。"
+        "EXIT_ADDRESS_INVALID" -> "请输入有效的出口 IPv4 或域名。"
+        "EXIT_PORT_INVALID" -> "出口端口应为 1 至 65535 的整数。"
+        "EXIT_AUTH_INVALID" -> "用户名和密码必须同时填写，各为 1 至 255 个 UTF-8 字节。"
+        "CREDENTIALS_REQUIRED" -> "此出口需要认证，请重新填写用户名和密码并保存。"
+        "EXPECTED_IP_INVALID" -> "预期出口地址必须是有效的 IPv4。"
+        "IP_MISMATCH" -> "观察到的出口 IPv4 与预期不符，连接未通过验证。"
+        "IP_INCONSISTENT" -> "出口 IPv4 来源不一致，暂不采用观察结果。"
+        "IP_UNAVAILABLE" -> "暂时无法观察出口 IPv4。"
+        "NETWORK_LOST" -> "底层网络已断开，等待网络恢复或手动断开。"
+        "VPN_DENIED", "VPN_PERMISSION_DENIED" -> "VPN 授权未通过，可再次连接并授权。"
+        "NOTIFICATION_REQUIRED" -> "请允许通知，以便查看后台 VPN 状态和断开操作。"
+        "EDIT_REQUIRES_DISCONNECT" -> "请先断开 VPN，再修改配置。"
+        "SUBSCRIPTION_TOO_LARGE", "DOWNLOAD_TOO_LARGE" -> "订阅超过 10 MiB 或节点数量等限制。"
+        "SUBSCRIPTION_UNSUPPORTED" -> "订阅格式不受支持，请使用 UTF-8 Clash / Mihomo YAML。"
+        "FILE_READ_FAILED" -> "无法读取所选文件，请重新选择。"
+        "DOWNLOAD_URL_INVALID" -> "请输入有效的 HTTPS 订阅链接。"
+        "DOWNLOAD_AUTH_FAILED" -> "订阅服务器拒绝认证，请检查链接是否有效。"
+        "DOWNLOAD_TLS_FAILED" -> "订阅服务器证书验证失败。"
+        "DOWNLOAD_TIMEOUT" -> "订阅下载超时，请重试。"
+        "DOWNLOAD_CANCELED" -> "订阅下载已取消。"
+        "DOWNLOAD_REDIRECT_LIMIT", "DOWNLOAD_REDIRECT_INVALID" -> "订阅重定向不符合安全要求。"
+        "DOWNLOAD_ENCODING_INVALID", "DOWNLOAD_PROTOCOL_FAILED", "DOWNLOAD_HTTP_FAILED", "DOWNLOAD_FAILED" -> "订阅下载失败，保留上次可用配置。"
+        "RULE_RESOURCE_UNAVAILABLE" -> "随包规则不可用，无法使用国内直连预设。"
+        "RULE_PRESET_INVALID" -> "请选择支持的路由预设。"
+        "PROFILE_CORRUPT", "PROFILE_READ_FAILED" -> "无法读取本地加密配置。可清除配置后重新导入。"
+        "PROFILE_KEY_MISSING", "PROFILE_KEY_INVALID" -> "本地加密密钥不可用。可清除配置后重新导入。"
+        "PROFILE_UNSUPPORTED_VERSION" -> "本地配置版本不兼容。请使用兼容版本或清除后重新导入。"
+        "PROFILE_SAVE_FAILED" -> "配置保存失败，上次配置未被替换。"
+        "PROFILE_WRITE_FAILED" -> "配置提交未完成，无法恢复全部记录。请断开并重新检查配置。"
+        "PROFILE_CLEAR_FAILED" -> "清除配置失败，请重试。"
+        "PROFILE_INVALID", "PROFILE_TOO_LARGE" -> "配置内容无效或超过限制，请检查表单。"
+        "PROBE_TLS_FAILED" -> "整链 HTTPS 证书验证失败。"
+        "PROBE_TIMEOUT" -> "整链验证超时，请检查前置与出口。"
+        "PROBE_REDIRECT", "PROBE_HTTP_STATUS" -> "整链 HTTPS 响应不符合要求，可能存在网络登录页。"
+        "PROBE_CANCELED" -> "整链验证已取消。"
+        "PROBE_UNAVAILABLE" -> "整链 HTTPS 验证失败，请检查前置与出口。"
+        "CORE_LOAD_FAILED" -> "原生内核不可用，请检查安装包与设备兼容性。"
+        "CORE_RESPONSE_INVALID", "CORE_SESSION_STALE", "CHAIN_COMPILE_FAILED" -> "内核操作未完成，请断开后重试。"
+        "FRONT_ENDPOINT_INVALID" -> "节点地址或端口无效"
+        "FRONT_CHAIN_UNSUPPORTED" -> "节点包含不支持的链路设置"
+        "FRONT_FIELD_INVALID" -> "节点字段类型无效"
+        "FRONT_TLS_INSECURE" -> "节点 TLS 验证设置不符合要求"
+        "FRONT_TRANSPORT_UNSUPPORTED" -> "节点传输方式不受支持"
+        "FRONT_CIPHER_UNSUPPORTED" -> "节点加密方式不受支持"
+        "FRONT_AUTH_INVALID" -> "节点认证参数无效"
+        "FRONT_PROTOCOL_UNSUPPORTED" -> "节点协议不在当前候选范围"
+        "DIAGNOSTICS_CHANGED" -> "状态已变化，请重新预览诊断后再导出。"
+        "DIAGNOSTICS_EXPORT_FAILED" -> "诊断导出失败，请重新选择保存位置。"
+        else -> "操作未完成，请检查配置或断开后重试。"
+    }
+}

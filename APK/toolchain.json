@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "cacheName": "chaindesk-android",
+  "artifacts": {
+    "jdk": {
+      "version": "21.0.13+9",
+      "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.13%2B9/OpenJDK21U-jdk_x64_windows_hotspot_21.0.13_9.zip",
+      "hashAlgorithm": "SHA256",
+      "hash": "a4dbaa05fca4bd89d84584e58c459bd732efebb1722af80ab13c6516832004f9",
+      "directory": "jdk-21.0.13+9"
+    },
+    "go": {
+      "version": "1.26.11",
+      "url": "https://go.dev/dl/go1.26.11.windows-amd64.zip",
+      "hashAlgorithm": "SHA256",
+      "hash": "71ae086f0137e665f855a811cc119152b6a783e0bbc1b906e709f46d80141eb0",
+      "directory": "go"
+    },
+    "androidCli": {
+      "version": "1.1.16919734",
+      "url": "https://dl.google.com/android/cli/1.1.16919734/windows_x86_64/android-cli.exe",
+      "hashAlgorithm": "SHA256",
+      "hash": "4b7d9dc15b3609ac7c952edff6b26fc131dff531a864692903676a886ea9b5b2",
+      "directory": "bin",
+      "format": "exe"
+    },
+    "gradle": {
+      "version": "9.4.1",
+      "url": "https://services.gradle.org/distributions/gradle-9.4.1-bin.zip",
+      "hashAlgorithm": "SHA256",
+      "hash": "2ab2958f2a1e51120c326cad6f385153bb11ee93b3c216c5fccebfdfbb7ec6cb",
+      "directory": "gradle-9.4.1"
+    }
+  },
+  "android": {
+    "minSdk": 26,
+    "compileSdk": "37.0",
+    "targetSdk": 37,
+    "agp": "9.2.0",
+    "kotlin": "2.2.10",
+    "buildTools": "36.0.0",
+    "ndk": "28.2.13676358",
+    "cmake": "3.31.6",
+    "sdkPackages": [
+      "platform-tools@37.0.1",
+      "platforms/android-37.0@2",
+      "build-tools/36.0.0",
+      "ndk/28.2.13676358",
+      "cmake/3.31.6"
+    ]
+  },
+  "mihomo": {
+    "version": "1.19.33",
+    "commit": "3f27ef39f8c96bbfbc8b0b9bb10f5c9ef60149d8"
+  }
+}

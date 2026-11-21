@@ -1,0 +1,17 @@
+proxies:
+  - name: 'same! & literal'
+    type: ss
+    server: EXAMPLE.com.
+    port: 443
+    cipher: aes-128-gcm
+    password: first
+    udp: true
+    tfo: true
+  - {password: first, cipher: aes-128-gcm, port: 443, server: example.com, type: ss, name: renamed}
+  - {name: 'same! & literal', type: ss, server: example.com, port: 443, cipher: aes-128-gcm, password: second}
+  - {name: '书 & * !', type: trojan, server: bücher.example, port: 443, password: fixture}
+tun: {enable: true}
+listeners: [untrusted]
+rules: [MATCH,DIRECT]
+script: {code: never-run}
+proxy-providers: {untrusted: {url: https://never.example}}

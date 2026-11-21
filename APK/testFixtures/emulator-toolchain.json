@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "scope": "Supplemental A0 emulator execution; not ARM64 phone acceptance",
+  "emulator": {
+    "package": "emulator@37.2.13",
+    "version": "37.2.13",
+    "url": "https://dl.google.com/android/repository/emulator-windows_x64-16740729.zip",
+    "archiveSha1": "4d7268aa7787c640ad892844e6c9a5f159e91ad3",
+    "executableSha256": "06af3c5da3c2cef7266822fe653f54371fc746d78db6f4282e1b2338a70970c8"
+  },
+  "image": {
+    "package": "system-images/android-37.0/google_apis_ps16k/x86_64@8",
+    "directory": "system-images/android-37.0/google_apis_ps16k/x86_64",
+    "revision": 8,
+    "url": "https://dl.google.com/android/repository/sys-img/google_apis/x86_64-ps16k-37.0_r08.zip",
+    "archiveBytes": 2081411720,
+    "archiveSha1": "3e04f6c168a573640e63fdd8afd71a3c4d947f64"
+  },
+  "avdName": "ChainDesk_A0_API37_16k"
+}

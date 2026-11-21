@@ -1,0 +1,3 @@
+android/app/src/main/assets/rules/* -text
+android/app/src/main/assets/rules/*.dat binary
+testFixtures/rules/upstream-* -text -whitespace

@@ -15,7 +15,7 @@
 | 文档项 | 内容 |
 | --- | --- |
 | 编制日期 | 2026-11-19，Asia/Shanghai |
-| 文档版本 | v1.0，开发前计划 |
+| 文档版本 | v1.1，开发前计划，补充双端开发规范 |
 | 项目目录 | `E:\VPN\LSDL` |
 | 本文档目录 | `E:\VPN\LSDL\APK` |
 | 用户已确认 | 独立安卓 App，包含现有链式代理；签名 APK，自用或小范围分发 |
@@ -342,12 +342,22 @@ Debug 使用独立包名后缀与测试证书；小范围 Release 采用独立�
 
 当前仓库使用 GPL-3.0-only；发行方案按相应许可准备对应源码、修改和构建材料，复用 Android 适配层前逐项核对其许可。小范围交付不免除向接收者履行适用许可义务；缺少授权来源的代码不得纳入 APK。[GPLv3 原文](https://www.gnu.org/licenses/gpl-3.0.html)
 
-## 7. 拟新增目录与职责
+## 7. 拟新增目录与双端开发规范
+
+### 7.1 目录与平台职责
+
+Windows 与 Android 继续使用同一个 `Keyou430/Chaindesk` 仓库，按目录区分平台，按任务分支隔离改动。保留现有桌面工程布局，Android 内容集中在 `APK/`，不为区分平台迁移或重命名桌面源码。
+
+| 平台 | 源码与脚本范围 | 技术路线与边界 |
+| --- | --- | --- |
+| Windows 桌面端 | 根目录 `src/`、`src-tauri/`、`crates/`、`scripts/chaindesk/` | 沿用 React + Tauri + Rust 及现有桌面构建与验收流程 |
+| Android 端 | `APK/android/`、`APK/core/`、`APK/scripts/`、`APK/testFixtures/`、`APK/docs/` | 按本计划建议的 Kotlin / Compose + Go / JNI 路线实施；技术验证未通过时按 A0 调整方案 |
 
 以下路径均相对 `E:\VPN\LSDL`，只在实际实施时按阶段创建；本次只写本文档。
 
 ```text
 APK/
+  AGENTS.md
   ChainDesk-Android-开发执行计划.md
   android/
     settings.gradle.kts / build.gradle.kts / gradle/libs.versions.toml
@@ -386,6 +396,37 @@ APK/
 
 同一职责可保存在同一文件，随实现规模拆分；不为目录示意预建空模块和空文件。Go 的 `subscription`、`chain` 只做纯数据转换，`engine` 才负责运行与网络行为。
 
+### 7.2 共同主线与任务分支
+
+1. 共同主线继续使用 `chaindesk/main`，保存双端源码；`origin` 指向 `https://github.com/Keyou430/Chaindesk.git`，官方 `upstream` 保留供上游同步使用。日常开发提交推送到 `origin`。
+2. 开工前用 `git status --short --branch` 检查当前分支与未提交改动，确认已有改动的任务归属；从已同步的共同主线创建任务分支。桌面任务命名为 `codex/desktop-<task>`，Android 任务命名为 `codex/android-<stage>-<task>`，例如 `codex/android-a0-core-bridge`。
+3. 任务说明写明平台、阶段、修改范围和验证方式。完成对应验收后按仓库评审及提交规则合并回 `chaindesk/main`，双端均在共同主线持续维护；已有桌面封版标签保持不变。
+
+### 7.3 Agent 规则与修改边界
+
+- 根目录 `AGENTS.md` 继续适用于全仓库；A0 在 `APK/AGENTS.md` 补充 Android 目录范围、固定工具链、构建与验证命令，不覆盖根规则。桌面端沿用现有 `src/AGENTS.md` 和 `src-tauri/AGENTS.md`。
+- Android 任务默认只修改 `APK/**`。必要的根目录忽略规则或 Android CI 配置调整须在任务范围中列明原因；不顺带修改桌面源码、根目录桌面依赖锁文件或封版产物。
+- 共用模型、规则样本或构建输入确需跨目录调整时，先在任务中说明两端影响，再验证受影响行为；不为未来可能共享的代码预建跨平台抽象。
+
+### 7.4 独立构建、验收与发布
+
+| 项目 | Windows 桌面端 | Android 端 |
+| --- | --- | --- |
+| 构建入口 | 根目录现有 pnpm / Cargo 命令及 `scripts/chaindesk/` | `APK/core/` 的 Go 构建与测试、`APK/android/` 的 Gradle 任务及 `APK/scripts/`；具体命令见第 9.2 节 |
+| 验收依据 | 桌面 M0～M5 记录及 Windows 隔离环境验证 | Android A0～A5 记录及真机 VPN、网络、安装升级验证 |
+| 产物目录 | 现有 `.chaindesk/releases/` | `APK/dist/<version>/` |
+| 版本记录 | 保留现有桌面版本与封版标识 | 独立维护应用版本、`versionCode`、签名证书指纹及对应源码提交 |
+
+新增 Android CI 时单独配置构建流程，按 `APK/**` 及其实际构建输入设置触发范围；桌面流程的路径判断须区分 Android 文件，避免 Android 专用改动触发整套桌面构建。共用输入变更按实际影响验证双端，文档修改不要求产品构建。
+
+Git 提交保存源码、依赖锁定文件、脚本和开发文档；安装包、构建缓存、签名私钥与真实凭证不加入 Git。发行归档分别记录平台、版本、源码提交和产物哈希；上传源码不代表本地安装包、封版归档和验收证据已备份，对外上传仍按第 6.3 节取得明确指令。
+
+### 7.5 本地工具链与存储
+
+- 按当前原生 Android 方案，仅开发 Android 时按需安装 JDK、Android SDK / NDK、Gradle、CMake 和 Go；无需恢复桌面的 `node_modules`、MSVC 或 WebView2 构建资源。
+- 需要构建或回归桌面端时，再按桌面基线准备其依赖；Android 与桌面的缓存、构建输出和验收证据分别管理。
+- 清理前确认哪些内容可重新安装或生成；`.chaindesk/` 中的封版归档、验收证据及其他未上传产物先另行备份，不因源码已推送而直接删除。
+
 ## 8. 分阶段开发任务与里程碑
 
 阶段使用 A0～A5 编号，与既有桌面 M0～M5 分开。工期从人员、测试设备和专用链路资源就绪的首个工作日计算，不把本文日期当作开工承诺。
@@ -420,12 +461,12 @@ flowchart LR
 
 **目标：** 先证明 Android 内核接入及两跳路由成立，避免先完成大量页面后才发现桥接不可用。
 
-**主要文件：** `APK/docs/android-baseline.md`、`APK/android/` 最小构建工程、`APK/core/engine/`、`APK/core/bridge/`、`APK/android/coreBridge/`、`APK/scripts/buildCore.ps1`。
+**主要文件：** `APK/AGENTS.md`、`APK/docs/android-baseline.md`、`APK/android/` 最小构建工程、`APK/core/engine/`、`APK/core/bridge/`、`APK/android/coreBridge/`、`APK/scripts/buildCore.ps1`。
 
 **任务 → 验证方式：**
 
-- [ ] A0.1 关联需求跟踪，登记本计划的用户确认项与建议项，冻结首版设备／系统、包名和协议清单 → 基线中每项有决策依据；没有测试资源的支持声明不能放行。
-- [ ] A0.2 固定源码提交、工具链及最小平台桥，编译 ARM64 `.so` 并形成可安装的测试 APK → 新目录按记录步骤重建；`System.loadLibrary` 和原生版本返回成功，无桌面运行时依赖。
+- [ ] A0.1 关联需求跟踪，按第 7 节确认任务分支与修改边界，登记本计划的用户确认项与建议项，冻结首版设备／系统、包名和协议清单 → 基线中每项有决策依据，任务分支命名与实际文件差异符合约定；没有测试资源的支持声明不能放行。
+- [ ] A0.2 固定源码提交、工具链及最小平台桥，将 Android 构建与验证命令写入 `APK/AGENTS.md`，编译 ARM64 `.so` 并形成可安装的测试 APK → 新目录按记录步骤重建；`System.loadLibrary` 和原生版本返回成功，无桌面运行时依赖。
 - [ ] A0.3 以一个 SS 前置和一个认证 SOCKS5 出口接入系统 TUN → 测试 App 请求受控 HTTPS 目标，两个服务端计数器增加，目标仅看到出口；隔离策略拒绝测试客户端绕过前置直连出口，以及前置绕过出口直连目标。
 - [ ] A0.4 检查外部 fd 接入、Socket 保护失败处理、底层网络切换、连续 50 次启停 → 无回环、无 FD 持续增长、无残留 VPN；回调失败时不继续发送。
 - [ ] A0.5 探明 mihomo 的全局状态与校验副作用，确认单实例、配置替换、内部定向探测接口 → 形成可重复验证记录；禁止依据函数名推断线程安全或多实例能力。
